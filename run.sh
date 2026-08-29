@@ -30,4 +30,4 @@ PF_PID=$!
 trap 'kill "$PF_PID" 2>/dev/null || true' EXIT
 
 echo "==> Console starting on http://localhost:$PORT"
-exec .venv/bin/uvicorn console.main:app --host 0.0.0.0 --port "$PORT"
+exec .venv/bin/uvicorn console.main:app --host 0.0.0.0 --port "$PORT" --reload

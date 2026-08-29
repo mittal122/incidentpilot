@@ -1,0 +1,64 @@
+- generic [active] [ref=f6e1]:
+  - banner [ref=f6e2]:
+    - generic [ref=f6e3]: ⛑ incidentpilot
+    - navigation [ref=f6e4]:
+      - link "Incidents" [ref=f6e5] [cursor=pointer]:
+        - /url: /
+      - link "Ask Holmes" [ref=f6e6] [cursor=pointer]:
+        - /url: /chat
+    - generic [ref=f6e7]: "cluster: incidentpilot-dev"
+  - main [ref=f6e8]:
+    - link "← all incidents" [ref=f6e9] [cursor=pointer]:
+      - /url: /
+    - 'heading "Namespace: testingtradingapp" [level=1] [ref=f6e10]'
+    - generic [ref=f6e11]:
+      - generic [ref=f6e12]:
+        - generic [ref=f6e13]: 3/3
+        - generic [ref=f6e14]: pods healthy
+      - generic [ref=f6e15]:
+        - generic [ref=f6e16]: "164"
+        - generic [ref=f6e17]: total restarts
+      - generic [ref=f6e18]:
+        - generic [ref=f6e19]: "0"
+        - generic [ref=f6e20]: recent incidents
+    - heading "Pods" [level=2] [ref=f6e21]
+    - table [ref=f6e22]:
+      - rowgroup [ref=f6e23]:
+        - row [ref=f6e24]:
+          - columnheader [ref=f6e25]
+          - columnheader "Pod" [ref=f6e26]
+          - columnheader "Ready" [ref=f6e27]
+          - columnheader "Restarts" [ref=f6e28]
+          - columnheader "Started" [ref=f6e29]
+          - columnheader "Uptime (this run)" [ref=f6e30]
+          - columnheader "Image" [ref=f6e31]
+      - rowgroup [ref=f6e32]:
+        - row [ref=f6e33] [cursor=pointer]:
+          - cell "●" [ref=f6e34]
+          - cell "backend-6ff9764fbc-l6qft Running" [ref=f6e35]: backend-6ff9764fbc-l6qftRunning
+          - cell "1/1" [ref=f6e36]
+          - cell "96" [ref=f6e37]
+          - cell "2026-07-13T20:31:40Z (46d ago)" [ref=f6e38]: 2026-07-13T20:31:40Z(46d ago)
+          - cell "53m" [ref=f6e39]
+          - cell "docker.io/mittal122/ai-trading-backend:v1.0.3" [ref=f6e40]
+        - row [ref=f6e41] [cursor=pointer]:
+          - cell "●" [ref=f6e42]
+          - cell "frontend-55f4986cd-lnkr2 Running" [ref=f6e43]: frontend-55f4986cd-lnkr2Running
+          - cell "1/1" [ref=f6e44]
+          - cell "34" [ref=f6e45]
+          - cell "2026-07-13T18:30:34Z (46d ago)" [ref=f6e46]: 2026-07-13T18:30:34Z(46d ago)
+          - cell "54m" [ref=f6e47]
+          - cell "docker.io/mittal122/ai-trading-frontend:v1.0.4" [ref=f6e48]
+        - row [ref=f6e49] [cursor=pointer]:
+          - cell "●" [ref=f6e50]
+          - cell "postgres-69fd7fd54f-zzm9t Running" [ref=f6e51]: postgres-69fd7fd54f-zzm9tRunning
+          - cell "1/1" [ref=f6e52]
+          - cell "34" [ref=f6e53]
+          - cell "2026-07-13T20:31:40Z (46d ago)" [ref=f6e54]: 2026-07-13T20:31:40Z(46d ago)
+          - cell "54m" [ref=f6e55]
+          - cell "docker.io/mittal122/ai-trading-postgres:17-alpine-r1" [ref=f6e56]
+    - heading "Recent incidents in testingtradingapp" [level=2] [ref=f6e57]
+    - table [ref=f6e58]:
+      - rowgroup [ref=f6e59]:
+        - row [ref=f6e60] [cursor=pointer]:
+          - cell "No incidents recorded for this namespace." [ref=f6e61]

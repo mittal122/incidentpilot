@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ namespace }} · Incident Console{% endblock %}
+{% block content %}
+<a href="/" class="back">← all incidents</a>
+<h1>Namespace: {{ namespace }}</h1>
+
+<div class="cards">
+  <div class="card {% if healthy == pods|length and pods %}ok{% elif pods %}bad{% endif %}">
+    <div class="num">{{ healthy }}/{{ pods|length }}</div>
+    <div class="label">pods healthy</div>
+  </div>
+  <div class="card {% if total_restarts > 10 %}bad{% endif %}">
+    <div class="num">{{ total_restarts }}</div>
+    <div class="label">total restarts</div>
+  </div>
+  <div class="card {% if incidents %}warn{% endif %}">
+    <div class="num">{{ incidents|length }}</div>
+    <div class="label">recent incidents</div>
+  </div>
+</div>
+
+<h2>Pods</h2>
+<table class="incident-table">
+  <thead>
+    <tr><th></th><th>Pod</th><th>Ready</th><th>Restarts</th><th>Started</th><th>Uptime (this run)</th><th>Image</th></tr>
+  </thead>
+  <tbody>
+    {% for p in pods %}
+    <tr>
+      <td>{% if p.healthy %}<span class="dot ok" title="healthy">●</span>{% else %}<span class="dot bad" title="{{ p.reason or p.phase }}">●</span>{% endif %}</td>
+      <td>{{ p.name }}<br><span class="muted">{{ p.phase }}{% if p.reason %} · {{ p.reason }}{% endif %}</span></td>
+      <td>{{ p.ready }}</td>
+      <td {% if p.restarts > 5 %}class="warn-text"{% endif %}>{{ p.restarts }}</td>
+      <td class="muted">{{ p.started or '—' }}<br>({{ p.age }} ago)</td>
+      <td>{{ p.uptime }}</td>
+      <td class="muted">{% for img in p.images %}{{ img }}<br>{% endfor %}</td>
+    </tr>
+    {% if p.simple_error %}
+    <tr class="explain-row"><td></td><td colspan="6">💡 {{ p.simple_error }}</td></tr>
+    {% endif %}
+    {% else %}
+    <tr><td colspan="7" class="muted empty">No pods in this namespace.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Recent incidents in {{ namespace }}</h2>
+<table class="incident-table">
+  <tbody>
+    {% for i in incidents %}
+    <tr onclick="window.location='/incidents/{{ i.id }}'">
+      <td><span class="badge {{ i.severity|lower }}">{{ i.severity }}</span></td>
+      <td>{{ i.title }}</td>
+      <td>{{ i.resource or '—' }}</td>
+      <td>{{ i.status }}</td>
+      <td class="muted">{{ i.created_at }}</td>
+    </tr>
+    {% else %}
+    <tr><td class="muted empty">No incidents recorded for this namespace.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

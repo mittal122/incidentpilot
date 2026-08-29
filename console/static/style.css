@@ -46,3 +46,16 @@ input[type=text] { flex: 1; background: var(--panel); border: 1px solid var(--bo
 #chat-log .q { color: var(--accent); font-weight: 600; margin-bottom: .3rem; }
 .action-ok { color: var(--ok); margin-top: .6rem; }
 .action-err { color: var(--high); margin-top: .6rem; }
+.cards { display: flex; gap: 1rem; margin: 1.2rem 0; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1rem 1.6rem; text-align: center; min-width: 120px; }
+.card .num { font-size: 1.8rem; font-weight: 700; }
+.card .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; }
+.card.ok .num { color: var(--ok); }
+.card.bad .num { color: var(--high); }
+.card.warn .num { color: var(--low); }
+.dot.ok { color: var(--ok); } .dot.bad { color: var(--high); }
+.warn-text { color: var(--low); font-weight: 700; }
+.explain-row td { color: var(--muted); font-style: italic; border-bottom: 1px solid var(--border); }
+a.ns-link { color: var(--accent); text-decoration: none; }
+a.ns-link:hover { text-decoration: underline; }

@@ -167,6 +167,109 @@ def chat(ask: str = Form(...)):
     )
 
 
+# ── namespace dashboard ──────────────────────────────────────────────
+
+# plain-language translations of Kubernetes error reasons
+SIMPLE_ERRORS = {
+    "CrashLoopBackOff": "App keeps crashing right after starting — check its logs; usually bad config, missing dependency, or an unreachable database.",
+    "ImagePullBackOff": "Kubernetes can't download the container image — image name/tag is wrong or the registry is unreachable.",
+    "ErrImagePull": "Kubernetes can't download the container image — image name/tag is wrong or the registry is unreachable.",
+    "OOMKilled": "The app used more memory than its limit and was killed — raise the memory limit or fix a leak.",
+    "Error": "The app exited with an error — check its logs for the reason.",
+    "Completed": "The container finished and exited — normal for jobs, a problem for servers.",
+    "ContainerCreating": "Still starting up — waiting for image/volumes. Only a problem if stuck for minutes.",
+    "Pending": "Pod can't be scheduled — usually not enough CPU/memory free on the nodes.",
+}
+
+
+def humanize_age(start_iso: str | None) -> str:
+    if not start_iso:
+        return "—"
+    delta = datetime.now(timezone.utc) - datetime.fromisoformat(
+        start_iso.replace("Z", "+00:00")
+    )
+    secs = int(delta.total_seconds())
+    if secs < 120:
+        return f"{secs}s"
+    if secs < 7200:
+        return f"{secs // 60}m"
+    if secs < 172800:
+        return f"{secs // 3600}h {(secs % 3600) // 60}m"
+    return f"{secs // 86400}d"
+
+
+def namespace_pods(namespace: str) -> list[dict]:
+    out = subprocess.run(
+        ["kubectl", "get", "pods", "-n", namespace, "-o", "json"],
+        capture_output=True, text=True, timeout=30,
+    )
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    pods = []
+    for item in json.loads(out.stdout).get("items", []):
+        statuses = item.get("status", {}).get("containerStatuses", [])
+        restarts = sum(s.get("restartCount", 0) for s in statuses)
+        ready = sum(1 for s in statuses if s.get("ready"))
+        # find the current problem reason, if any
+        reason = None
+        for s in statuses:
+            state = s.get("state", {})
+            if "waiting" in state:
+                reason = state["waiting"].get("reason")
+            elif "terminated" in state:
+                reason = state["terminated"].get("reason")
+            if reason:
+                break
+        phase = item["status"].get("phase", "Unknown")
+        if reason is None and phase == "Pending":
+            reason = "Pending"
+        started = item["status"].get("startTime")
+        # uptime of the current run = newest container start (resets on restart)
+        run_starts = [
+            s["state"]["running"]["startedAt"]
+            for s in statuses if "running" in s.get("state", {})
+        ]
+        healthy = phase == "Running" and ready == len(statuses) and not reason
+        pods.append({
+            "name": item["metadata"]["name"],
+            "phase": phase,
+            "ready": f"{ready}/{len(statuses)}",
+            "restarts": restarts,
+            "started": started,
+            "age": humanize_age(started),
+            "uptime": humanize_age(max(run_starts)) if run_starts else "—",
+            "images": [s.get("image", "?") for s in statuses],
+            "reason": reason,
+            "simple_error": SIMPLE_ERRORS.get(
+                reason, f"Problem state: {reason}" if reason else None
+            ),
+            "healthy": healthy,
+        })
+    return pods
+
+
+@app.get("/ns/{namespace}", response_class=HTMLResponse)
+def ns_dashboard(request: Request, namespace: str):
+    if not K8S_NAME.match(namespace):
+        return HTMLResponse("invalid namespace", status_code=400)
+    try:
+        pods = namespace_pods(namespace)
+    except Exception as e:
+        return HTMLResponse(f"<pre>kubectl error: {escape(str(e))}</pre>", status_code=502)
+    with db() as conn:
+        incidents = conn.execute(
+            "SELECT * FROM incidents WHERE namespace = ? ORDER BY created_at DESC LIMIT 20",
+            (namespace,),
+        ).fetchall()
+    return render(
+        request, "namespace.html", page="incidents", namespace=namespace,
+        pods=pods,
+        healthy=sum(1 for p in pods if p["healthy"]),
+        total_restarts=sum(p["restarts"] for p in pods),
+        incidents=incidents,
+    )
+
+
 # ── actions ──────────────────────────────────────────────────────────
 
 @app.post("/incidents/{incident_id}/restart", response_class=HTMLResponse)

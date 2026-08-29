@@ -3,7 +3,7 @@
 {% block content %}
 <a href="/" class="back">← all incidents</a>
 <h1><span class="badge {{ i.severity|lower }}">{{ i.severity }}</span> {{ i.title }}</h1>
-<p class="muted">{{ i.namespace or '—' }} / {{ i.resource or '—' }} · {{ i.created_at }} · status: {{ i.status }}</p>
+<p class="muted">{% if i.namespace %}<a class="ns-link" href="/ns/{{ i.namespace }}">{{ i.namespace }}</a>{% else %}—{% endif %} / {{ i.resource or '—' }} · {{ i.created_at }} · status: {{ i.status }}</p>
 
 <section>
   <h2>Enrichment (from Robusta)</h2>

@@ -2,7 +2,7 @@
 <tr class="sev-{{ i.severity|lower }}" onclick="window.location='/incidents/{{ i.id }}'">
   <td><span class="badge {{ i.severity|lower }}">{{ i.severity }}</span></td>
   <td>{{ i.title }}</td>
-  <td>{{ i.namespace or '—' }}</td>
+  <td>{% if i.namespace %}<a class="ns-link" href="/ns/{{ i.namespace }}" onclick="event.stopPropagation()">{{ i.namespace }}</a>{% else %}—{% endif %}</td>
   <td>{{ i.resource or '—' }}</td>
   <td>{{ i.status }}</td>
   <td class="muted">{{ i.created_at }}</td>
