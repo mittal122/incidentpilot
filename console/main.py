@@ -294,6 +294,7 @@ def cluster_overview() -> list[dict]:
         ).fetchall())
 
     cards = []
+    severity_rank = {"crit": 0, "warn": 1, "ok": 2}
     for ns, pods in sorted(groups.items()):
         healthy = sum(1 for p in pods if p["healthy"])
         reasons = {p["reason"] for p in pods if p["reason"]}
@@ -317,6 +318,7 @@ def cluster_overview() -> list[dict]:
             "images": len({img for p in pods for img in p["images"]}),
             "problem": next(iter(reasons), None),
         })
+    cards.sort(key=lambda c: (severity_rank[c["status"]], c["name"]))
     return cards
 
 
