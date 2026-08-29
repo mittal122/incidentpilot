@@ -4,7 +4,10 @@
 <a href="/" class="back">← overview</a>
 <div class="page-head logs-head">
   <h1>Namespace: {{ namespace }}</h1>
-  <a class="btn-link" href="/ns/{{ namespace }}/logs">📜 View Logs</a>
+  <div style="display:flex; gap:.6rem; align-items:center">
+    {{ autoheal_html|safe }}
+    <a class="btn-link" href="/ns/{{ namespace }}/logs">📜 View Logs</a>
+  </div>
 </div>
 
 <div class="cards">
@@ -45,6 +48,13 @@
     {% else %}
     <tr><td colspan="8" class="muted empty">No pods in this namespace.</td></tr>
     {% endfor %}
+  </tbody>
+</table>
+
+<h2>Automated &amp; approved actions</h2>
+<table class="incident-table">
+  <tbody hx-get="/partials/actions/{{ namespace }}" hx-trigger="every 10s" hx-swap="innerHTML">
+    {% include "_action_rows.html" %}
   </tbody>
 </table>
 

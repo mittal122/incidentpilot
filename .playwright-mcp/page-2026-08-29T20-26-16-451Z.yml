@@ -1,0 +1,179 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ⛑ incidentpilot
+    - navigation [ref=e4]:
+      - link "Overview" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=e7] [cursor=pointer]:
+        - /url: /chat
+      - link "Settings" [ref=e8] [cursor=pointer]:
+        - /url: /settings
+    - generic [ref=e9]: "cluster: incidentpilot-dev"
+  - main [ref=e10]:
+    - link "← overview" [ref=e11] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e12]:
+      - 'heading "Namespace: demo-lab" [level=1] [ref=e13]'
+      - generic [ref=e14]:
+        - 'button "🩺 Auto-Heal: ON" [ref=e15] [cursor=pointer]'
+        - link "📜 View Logs" [ref=e16] [cursor=pointer]:
+          - /url: /ns/demo-lab/logs
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]: 4/4
+        - generic [ref=e20]: pods healthy
+      - generic [ref=e21]:
+        - generic [ref=e22]: "0"
+        - generic [ref=e23]: total restarts
+      - generic [ref=e24]:
+        - generic [ref=e25]: "9"
+        - generic [ref=e26]: recent incidents
+    - heading "Pods" [level=2] [ref=e27]
+    - table [ref=e28]:
+      - rowgroup [ref=e29]:
+        - row [ref=e30]:
+          - columnheader [ref=e31]
+          - columnheader "Pod" [ref=e32]
+          - columnheader "Ready" [ref=e33]
+          - columnheader "Restarts" [ref=e34]
+          - columnheader "Started" [ref=e35]
+          - columnheader "Uptime (this run)" [ref=e36]
+          - columnheader "Image" [ref=e37]
+          - columnheader [ref=e38]
+      - rowgroup [ref=e39]:
+        - row [ref=e40] [cursor=pointer]:
+          - cell "●" [ref=e41]
+          - cell "cart-8687cb99dd-9cwlp Running" [ref=e42]: cart-8687cb99dd-9cwlpRunning
+          - cell "1/1" [ref=e43]
+          - cell "0" [ref=e44]
+          - cell "2026-08-29T12:49:29Z (7h 36m ago)" [ref=e45]: 2026-08-29T12:49:29Z(7h 36m ago)
+          - cell "7h 36m" [ref=e46]
+          - cell "docker.io/library/busybox:1.36" [ref=e47]
+          - cell [ref=e48]:
+            - link "logs" [ref=e49]:
+              - /url: /ns/demo-lab/logs?pod=cart-8687cb99dd-9cwlp
+        - row [ref=e50] [cursor=pointer]:
+          - cell "●" [ref=e51]
+          - cell "cart-8687cb99dd-d9wcx Running" [ref=e52]: cart-8687cb99dd-d9wcxRunning
+          - cell "1/1" [ref=e53]
+          - cell "0" [ref=e54]
+          - cell "2026-08-29T20:26:05Z (11s ago)" [ref=e55]: 2026-08-29T20:26:05Z(11s ago)
+          - cell "11s" [ref=e56]
+          - cell "docker.io/library/busybox:1.36" [ref=e57]
+          - cell [ref=e58]:
+            - link "logs" [ref=e59]:
+              - /url: /ns/demo-lab/logs?pod=cart-8687cb99dd-d9wcx
+        - row [ref=e60] [cursor=pointer]:
+          - cell "●" [ref=e61]
+          - cell "webshop-7b8d8c575-dn84w Running" [ref=e62]: webshop-7b8d8c575-dn84wRunning
+          - cell "1/1" [ref=e63]
+          - cell "0" [ref=e64]
+          - cell "2026-08-29T20:26:05Z (11s ago)" [ref=e65]: 2026-08-29T20:26:05Z(11s ago)
+          - cell "11s" [ref=e66]
+          - cell "docker.io/library/nginx:1.27-alpine" [ref=e67]
+          - cell [ref=e68]:
+            - link "logs" [ref=e69]:
+              - /url: /ns/demo-lab/logs?pod=webshop-7b8d8c575-dn84w
+        - row [ref=e70] [cursor=pointer]:
+          - cell "●" [ref=e71]
+          - cell "webshop-7b8d8c575-hzmzf Running" [ref=e72]: webshop-7b8d8c575-hzmzfRunning
+          - cell "1/1" [ref=e73]
+          - cell "0" [ref=e74]
+          - cell "2026-08-29T20:26:05Z (11s ago)" [ref=e75]: 2026-08-29T20:26:05Z(11s ago)
+          - cell "11s" [ref=e76]
+          - cell "docker.io/library/nginx:1.27-alpine" [ref=e77]
+          - cell [ref=e78]:
+            - link "logs" [ref=e79]:
+              - /url: /ns/demo-lab/logs?pod=webshop-7b8d8c575-hzmzf
+    - heading "Automated & approved actions" [level=2] [ref=e80]
+    - table [ref=e81]:
+      - rowgroup [ref=e82]:
+        - row [ref=e83] [cursor=pointer]:
+          - cell "escalated" [ref=e84]
+          - cell "webshop-76df84b64" [ref=e86]
+          - cell "autoheal" [ref=e87]
+          - cell "3 auto-restarts in the last hour did not fix Error — human needed" [ref=e88]
+          - cell "2026-08-29 20:23:17 UTC" [ref=e89]
+        - row [ref=e90] [cursor=pointer]:
+          - cell "restart-pod" [ref=e91]
+          - cell "webshop-76df84b64" [ref=e93]
+          - cell "autoheal" [ref=e94]
+          - cell "pod webshop-76df84b64-rn2cg (Error) — heal 3/3" [ref=e95]
+          - cell "2026-08-29 20:22:47 UTC" [ref=e96]
+        - row [ref=e97] [cursor=pointer]:
+          - cell "restart-pod" [ref=e98]
+          - cell "webshop-76df84b64" [ref=e100]
+          - cell "autoheal" [ref=e101]
+          - cell "pod webshop-76df84b64-2zb44 (Error) — heal 2/3" [ref=e102]
+          - cell "2026-08-29 20:22:47 UTC" [ref=e103]
+        - row [ref=e104] [cursor=pointer]:
+          - cell "restart-pod" [ref=e105]
+          - cell "webshop-76df84b64" [ref=e107]
+          - cell "autoheal" [ref=e108]
+          - cell "pod webshop-76df84b64-6gl64 (Error) — heal 1/3" [ref=e109]
+          - cell "2026-08-29 20:22:17 UTC" [ref=e110]
+        - row [ref=e111] [cursor=pointer]:
+          - cell "autoheal-on" [ref=e112]
+          - cell "demo-lab" [ref=e114]
+          - cell "ui" [ref=e115]
+          - cell [ref=e116]
+          - cell "2026-08-29 20:22:15 UTC" [ref=e117]
+    - heading "Recent incidents in demo-lab" [level=2] [ref=e118]
+    - table [ref=e119]:
+      - rowgroup [ref=e120]:
+        - row [ref=e121] [cursor=pointer]:
+          - cell "HIGH" [ref=e122]
+          - cell "Crashing pod webshop-76df84b64-w4xjt in namespace demo-lab" [ref=e123]
+          - cell "webshop-76df84b64-w4xjt" [ref=e124]
+          - cell "firing" [ref=e125]
+          - cell "2026-08-29 20:23:22 UTC" [ref=e126]
+        - row [ref=e127] [cursor=pointer]:
+          - cell "LOW" [ref=e128]
+          - cell "[RESOLVED] Pod is crash looping." [ref=e129]
+          - cell "Unresolved" [ref=e130]
+          - cell "firing" [ref=e131]
+          - cell "2026-08-29 12:54:30 UTC" [ref=e132]
+        - row [ref=e133] [cursor=pointer]:
+          - cell "LOW" [ref=e134]
+          - cell "[RESOLVED] Pod is crash looping." [ref=e135]
+          - cell "Unresolved" [ref=e136]
+          - cell "firing" [ref=e137]
+          - cell "2026-08-29 12:54:30 UTC" [ref=e138]
+        - row [ref=e139] [cursor=pointer]:
+          - cell "LOW" [ref=e140]
+          - cell "[RESOLVED] Deployment has not matched the expected number of replicas." [ref=e141]
+          - cell "webshop" [ref=e142]
+          - cell "firing" [ref=e143]
+          - cell "2026-08-29 12:50:00 UTC" [ref=e144]
+        - row [ref=e145] [cursor=pointer]:
+          - cell "LOW" [ref=e146]
+          - cell "Pod is crash looping." [ref=e147]
+          - cell "webshop-c47c9b6fb-4jxtj" [ref=e148]
+          - cell "firing" [ref=e149]
+          - cell "2026-08-29 12:36:03 UTC" [ref=e150]
+        - row [ref=e151] [cursor=pointer]:
+          - cell "LOW" [ref=e152]
+          - cell "Pod is crash looping." [ref=e153]
+          - cell "webshop-c47c9b6fb-vkxdm" [ref=e154]
+          - cell "firing" [ref=e155]
+          - cell "2026-08-29 12:36:02 UTC" [ref=e156]
+        - row [ref=e157] [cursor=pointer]:
+          - cell "LOW" [ref=e158]
+          - cell "Deployment has not matched the expected number of replicas." [ref=e159]
+          - cell "webshop" [ref=e160]
+          - cell "firing" [ref=e161]
+          - cell "2026-08-29 12:33:30 UTC" [ref=e162]
+        - row [ref=e163] [cursor=pointer]:
+          - cell "HIGH" [ref=e164]
+          - cell "Crashing pod webshop-c47c9b6fb-vkxdm in namespace demo-lab" [ref=e165]
+          - cell "webshop-c47c9b6fb-vkxdm" [ref=e166]
+          - cell "firing" [ref=e167]
+          - cell "2026-08-29 12:19:46 UTC" [ref=e168]
+        - row [ref=e169] [cursor=pointer]:
+          - cell "HIGH" [ref=e170]
+          - cell "Crashing pod webshop-76df84b64-86vsc in namespace demo-lab" [ref=e171]
+          - cell "webshop-76df84b64-86vsc" [ref=e172]
+          - cell "firing" [ref=e173]
+          - cell "2026-08-29 12:18:29 UTC" [ref=e174]

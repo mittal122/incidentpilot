@@ -88,6 +88,11 @@ a.ns-link:hover { text-decoration: underline; }
 .pill.ok   { color: var(--ok);   background: rgba(63, 185, 80, .12); }
 .pill.warn { color: var(--low);  background: rgba(210, 153, 34, .12); }
 .pill.crit { color: var(--high); background: rgba(248, 81, 73, .14); }
+.pill.heal { background: rgba(88, 166, 255, .14); }
+.autoheal-btn { background: var(--panel); color: var(--muted);
+  border: 1px solid var(--border); }
+.autoheal-btn.on { background: rgba(63, 185, 80, .13); color: var(--ok);
+  border-color: rgba(63, 185, 80, .5); }
 .ns-card-hero { margin: 1.05rem 0 .9rem; display: flex; align-items: baseline; gap: .5rem; }
 .hero-num { font-size: 2.1rem; font-weight: 750; letter-spacing: -.03em; line-height: 1; }
 .hero-of { color: var(--muted); font-size: 1.25rem; font-weight: 500; }

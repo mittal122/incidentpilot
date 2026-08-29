@@ -2,7 +2,9 @@
 {% block title %}Ask Holmes · Incident Console{% endblock %}
 {% block content %}
 <h1>Ask Holmes</h1>
-<p class="muted">Free-form questions about the cluster. Holmes has access to kubectl, Prometheus and Loki toolsets.</p>
+<p class="muted">Free-form questions about the cluster — follow-ups remember context. Operational commands work too:
+<code>restart pod NAME in NAMESPACE</code> · <code>scale DEPLOY in NS to N</code> · <code>rollback DEPLOY in NS</code> · <code>describe pod NAME in NS</code> — mutations always show an approval button first.
+<button class="ghost" style="margin-left:.6rem" hx-post="/api/chat/reset" hx-target="#chat-log" hx-swap="beforeend">New chat</button></p>
 <div id="chat-log"></div>
 <form hx-post="/api/chat" hx-target="#chat-log" hx-swap="beforeend" hx-indicator="#chat-spinner"
       hx-on::after-request="if(event.detail.successful) this.reset()">

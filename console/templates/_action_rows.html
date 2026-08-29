@@ -1,0 +1,17 @@
+{% for a in auto_actions %}
+<tr>
+  <td>
+    {% if a.verb == 'escalated' %}<span class="chip err">escalated</span>
+    {% elif a.verb == 'needs-human' %}<span class="chip warn">needs human</span>
+    {% elif a.ok == 1 %}<span class="chip ok">{{ a.verb }}</span>
+    {% elif a.ok == 0 %}<span class="chip err">{{ a.verb }} failed</span>
+    {% else %}<span class="chip warn">{{ a.verb }}</span>{% endif %}
+  </td>
+  <td>{{ a.target }}</td>
+  <td><span class="muted">{{ a.source }}</span></td>
+  <td class="muted">{{ a.detail }}</td>
+  <td class="muted">{{ a.ts }}</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="muted empty">No automated or approved actions yet.</td></tr>
+{% endfor %}

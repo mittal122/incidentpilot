@@ -3,6 +3,7 @@
   <div class="ns-card-head">
     <span class="status-dot {{ c.status }}"></span>
     <span class="ns-name">{{ c.name }}</span>
+    {% if c.autoheal %}<span class="pill heal" title="Auto-Heal enabled">🩺</span>{% endif %}
     <span class="pill {{ c.status }}">{{ c.status_label }}</span>
   </div>
   <div class="ns-card-hero">
