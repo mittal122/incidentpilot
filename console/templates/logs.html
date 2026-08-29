@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Logs · {{ namespace }} · Incident Console{% endblock %}
+{% block content %}
+<a href="/ns/{{ namespace }}" class="back">← {{ namespace }}</a>
+<div class="page-head logs-head">
+  <h1>Logs: {{ namespace }}</h1>
+  <select id="pod-select" onchange="window.location='/ns/{{ namespace }}/logs?pod='+this.value">
+    {% for name in pod_names %}
+    <option value="{{ name }}" {% if name == pod %}selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-raw" onclick="showTab('raw')">Raw logs</button>
+  <button class="tab" id="tab-ai" onclick="showTab('ai')">AI summary</button>
+</div>
+
+<div id="pane-raw">
+  <div class="log-toolbar">
+    <input type="text" id="log-search" placeholder="filter lines…" oninput="filterLogs(this.value)">
+    <label class="muted"><input type="checkbox" id="auto-refresh" checked> auto-refresh</label>
+    <label class="muted"><input type="checkbox" id="prev-logs"
+      onchange="document.getElementById('log-body').setAttribute('hx-get',
+        '/partials/logs/{{ namespace }}/{{ pod }}?previous='+(this.checked?1:0)); htmx.process(document.getElementById('log-body')); htmx.trigger('#log-body','refresh')">
+      previous run (crashed container)</label>
+    <button class="ghost" onclick="navigator.clipboard.writeText(document.getElementById('log-body').innerText).then(()=>this.textContent='copied!')">copy</button>
+  </div>
+  <pre id="log-body" class="terminal"
+       hx-get="/partials/logs/{{ namespace }}/{{ pod }}"
+       hx-trigger="load, refresh, every 5s [document.getElementById('auto-refresh').checked]"
+       hx-swap="innerHTML">loading…</pre>
+</div>
+
+<div id="pane-ai" style="display:none">
+  <div id="ai-summary">
+    <form hx-post="/api/summarize-logs" hx-target="#ai-summary" hx-swap="innerHTML"
+          hx-indicator="#ai-spinner">
+      <input type="hidden" name="namespace" value="{{ namespace }}">
+      <input type="hidden" name="pod" value="{{ pod }}">
+      <button type="submit">✨ Explain these logs</button>
+      <span id="ai-spinner" class="htmx-indicator">Holmes is reading the logs…</span>
+    </form>
+  </div>
+</div>
+
+<script>
+function showTab(which) {
+  document.getElementById('pane-raw').style.display = which === 'raw' ? '' : 'none';
+  document.getElementById('pane-ai').style.display = which === 'ai' ? '' : 'none';
+  document.getElementById('tab-raw').classList.toggle('active', which === 'raw');
+  document.getElementById('tab-ai').classList.toggle('active', which === 'ai');
+}
+function filterLogs(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#log-body > span').forEach(s =>
+    s.style.display = !q || s.textContent.toLowerCase().includes(q) ? '' : 'none');
+}
+</script>
+{% endblock %}

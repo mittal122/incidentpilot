@@ -344,6 +344,92 @@ def ns_dashboard(request: Request, namespace: str):
     )
 
 
+# ── logs ─────────────────────────────────────────────────────────────
+
+LOG_LEVELS = (
+    ("err", ("error", "fatal", "panic", "exception", "traceback", "fail")),
+    ("warn", ("warn", "warning", "deprecat")),
+)
+
+
+def fetch_logs(namespace: str, pod: str, previous: bool = False) -> str:
+    cmd = ["kubectl", "logs", "-n", namespace, pod, "--tail=500", "--timestamps"]
+    if previous:
+        cmd.append("--previous")
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    return out.stdout
+
+
+def highlight_logs(raw: str) -> str:
+    """Wrap each line in a span classed by log level for terminal colors."""
+    lines = []
+    for line in raw.splitlines():
+        low = line.lower()
+        cls = "info"
+        for level, needles in LOG_LEVELS:
+            if any(n in low for n in needles):
+                cls = level
+                break
+        lines.append(f'<span class="log-{cls}">{escape(line)}</span>')
+    return "\n".join(lines) or '<span class="log-info">(no log output)</span>'
+
+
+@app.get("/ns/{namespace}/logs", response_class=HTMLResponse)
+def logs_page(request: Request, namespace: str, pod: str = ""):
+    if not K8S_NAME.match(namespace):
+        return HTMLResponse("invalid namespace", status_code=400)
+    try:
+        pods = namespace_pods(namespace)
+    except Exception as e:
+        return HTMLResponse(f"<pre>kubectl error: {escape(str(e))}</pre>", status_code=502)
+    pod_names = [p["name"] for p in pods]
+    if not pod and pod_names:
+        pod = pod_names[0]
+    return render(request, "logs.html", page="incidents", namespace=namespace,
+                  pod=pod, pod_names=pod_names)
+
+
+@app.get("/partials/logs/{namespace}/{pod}", response_class=HTMLResponse)
+def logs_partial(namespace: str, pod: str, previous: int = 0):
+    if not (K8S_NAME.match(namespace) and K8S_NAME.match(pod)):
+        return HTMLResponse("invalid name", status_code=400)
+    try:
+        raw = fetch_logs(namespace, pod, previous=bool(previous))
+    except Exception as e:
+        return HTMLResponse(f'<span class="log-err">cannot fetch logs: {escape(str(e))}</span>')
+    return HTMLResponse(highlight_logs(raw))
+
+
+@app.post("/api/summarize-logs", response_class=HTMLResponse)
+def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
+    if not (K8S_NAME.match(namespace) and K8S_NAME.match(pod)):
+        return HTMLResponse("invalid name", status_code=400)
+    try:
+        raw = fetch_logs(namespace, pod)
+    except Exception:
+        raw = ""
+        try:  # crashed pods often only have logs in the previous container
+            raw = fetch_logs(namespace, pod, previous=True)
+        except Exception as e:
+            return HTMLResponse(f'<div class="action-err">cannot fetch logs: {escape(str(e))}</div>')
+    tail = "\n".join(raw.splitlines()[-200:])
+    question = (
+        f"Below are the last log lines of pod {namespace}/{pod}. Do not use any tools. "
+        "Explain them for a developer in a few seconds of reading. Answer in exactly "
+        "these sections: **Summary** (2-3 plain-English sentences), **Key events** "
+        "(grouped, not line-by-line), **Warnings**, **Errors** (with likely cause), "
+        "**Recommended actions** (concrete next steps). Skip noise and repetition. "
+        "If a section is empty write 'none'.\n\nLOGS:\n" + tail
+    )
+    try:
+        analysis = ask_holmes(question)
+    except Exception as e:
+        return HTMLResponse(f'<div class="action-err">Holmes error: {escape(str(e))}</div>')
+    return HTMLResponse(f'<pre class="investigation">{escape(analysis)}</pre>')
+
+
 # ── actions ──────────────────────────────────────────────────────────
 
 @app.post("/incidents/{incident_id}/restart", response_class=HTMLResponse)

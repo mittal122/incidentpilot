@@ -1,0 +1,32 @@
+- generic [active] [ref=f8e1]:
+  - banner [ref=f8e2]:
+    - generic [ref=f8e3]: ⛑ incidentpilot
+    - navigation [ref=f8e4]:
+      - link "Overview" [ref=f8e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=f8e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=f8e7] [cursor=pointer]:
+        - /url: /chat
+    - generic [ref=f8e8]: "cluster: incidentpilot-dev"
+  - main [ref=f8e9]:
+    - link "← all incidents" [ref=f8e10] [cursor=pointer]:
+      - /url: /incidents
+    - heading "LOW Pod is crash looping." [level=1] [ref=f8e11]
+    - paragraph [ref=f8e12]:
+      - link "incidentpilot-demo" [ref=f8e13] [cursor=pointer]:
+        - /url: /ns/incidentpilot-demo
+      - text: "/ checkout-d5bcbd854-qxn8v · 2026-08-29 10:37:05 UTC · status: firing"
+    - generic [ref=f8e14]:
+      - heading "Enrichment (from Robusta)" [level=2] [ref=f8e15]
+      - generic [ref=f8e16]: "Pod incidentpilot-demo/checkout-d5bcbd854-qxn8v (checkout) is in waiting state (reason: \"CrashLoopBackOff\") on cluster ."
+    - generic [ref=f8e17]:
+      - heading "Root cause (HolmesGPT)" [level=2] [ref=f8e18]
+      - generic [ref=f8e19]: "## Root Cause Analysis The pod `checkout-d5bcbd854-qxn8v` in namespace `incidentpilot-demo` is crash looping because the checkout service cannot authenticate to the PostgreSQL database. ### Evidence from logs The pod logs show this repeating cycle: ``` [INFO] checkout-service v42 starting (build a3c880e) [INFO] connecting to postgres orders-db:5432 as user 'checkout_svc' FATAL: connection to database \"orders\" failed: password authentication failed for user \"checkout_svc\" [ERROR] connection pool init failed after 3 retries, shutting down ``` The service: 1. Starts up and attempts to connect to `postgres orders-db:5432` as `checkout_svc` 2. Authentication fails with `password authentication failed for user \"checkout_svc\"` 3. The connection pool init fails after 3 retries and shuts down 4. The process exits → pod restarts → repeats ### Root Cause **Password authentication failure** — the `checkout_svc` user's password does not match what the database has configured. This could be due to: 1. **Misconfigured database password** in the checkout service configuration (env vars, configmap, or secret) 2. **Database user password changed** without updating the service configuration 3. **Wrong database name** — the service connects to `\"orders\"` but the DB may be named differently (e.g., `\"orders-db\"`) 4. **Missing/incorrect PostgreSQL authentication setup** (pg_hba.conf, password not set for the user) ### Suggested Fix 1. **Check the database credentials** — verify the password for `checkout_svc` matches what's in the database 2. **Inspect the service configuration** — check configmaps, secrets, or environment variables for the database password 3. **Verify the PostgreSQL user exists** and has the correct password set 4. **Restart the pod** after fixing the credential issue Example troubleshooting steps: ```bash # Check the deployment/config for DB credentials kubectl get deployment -n incidentpilot-demo -o yaml # Check if there's a secret with the DB password kubectl get secrets -n incidentpilot-demo # Verify the PostgreSQL user and password in the database # (would need to connect to the DB and check pg_users / pg_sha256) ``` Once the password is corrected or the authentication is properly configured, the pod should start successfully and stop crash looping."
+    - generic [ref=f8e21]:
+      - heading "Actions" [level=2] [ref=f8e22]
+      - 'button "♻ Approve: restart pod checkout-d5bcbd854-qxn8v" [ref=f8e23] [cursor=pointer]'
+    - generic [ref=f8e24]:
+      - heading "Raw alert payload" [level=2] [ref=f8e25]
+      - group [ref=f8e26]:
+        - generic "show JSON" [ref=f8e27]

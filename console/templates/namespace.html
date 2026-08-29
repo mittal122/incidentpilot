@@ -2,7 +2,10 @@
 {% block title %}{{ namespace }} · Incident Console{% endblock %}
 {% block content %}
 <a href="/" class="back">← overview</a>
-<h1>Namespace: {{ namespace }}</h1>
+<div class="page-head logs-head">
+  <h1>Namespace: {{ namespace }}</h1>
+  <a class="btn-link" href="/ns/{{ namespace }}/logs">📜 View Logs</a>
+</div>
 
 <div class="cards">
   <div class="card {% if healthy == pods|length and pods %}ok{% elif pods %}bad{% endif %}">
@@ -22,7 +25,7 @@
 <h2>Pods</h2>
 <table class="incident-table">
   <thead>
-    <tr><th></th><th>Pod</th><th>Ready</th><th>Restarts</th><th>Started</th><th>Uptime (this run)</th><th>Image</th></tr>
+    <tr><th></th><th>Pod</th><th>Ready</th><th>Restarts</th><th>Started</th><th>Uptime (this run)</th><th>Image</th><th></th></tr>
   </thead>
   <tbody>
     {% for p in pods %}
@@ -34,12 +37,13 @@
       <td class="muted">{{ p.started or '—' }}<br>({{ p.age }} ago)</td>
       <td>{{ p.uptime }}</td>
       <td class="muted">{% for img in p.images %}{{ img }}<br>{% endfor %}</td>
+      <td><a class="ns-link" href="/ns/{{ namespace }}/logs?pod={{ p.name }}">logs</a></td>
     </tr>
     {% if p.simple_error %}
-    <tr class="explain-row"><td></td><td colspan="6">💡 {{ p.simple_error }}</td></tr>
+    <tr class="explain-row"><td></td><td colspan="7">💡 {{ p.simple_error }}</td></tr>
     {% endif %}
     {% else %}
-    <tr><td colspan="7" class="muted empty">No pods in this namespace.</td></tr>
+    <tr><td colspan="8" class="muted empty">No pods in this namespace.</td></tr>
     {% endfor %}
   </tbody>
 </table>
