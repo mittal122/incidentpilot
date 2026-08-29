@@ -23,7 +23,7 @@ from fastapi.templating import Jinja2Templates
 BASE_DIR = Path(__file__).parent
 DB_PATH = os.environ.get("DB_PATH", str(BASE_DIR / "incidents.db"))
 HOLMES_URL = os.environ.get("HOLMES_URL", "http://localhost:10001")
-HOLMES_MODEL = os.environ.get("HOLMES_MODEL", "nvidia-deepseek")
+HOLMES_MODEL = os.environ.get("HOLMES_MODEL", "nemotron-fast")
 CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "incidentpilot-dev")
 K8S_NAME = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
 
