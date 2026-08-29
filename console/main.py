@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 BASE_DIR = Path(__file__).parent
 DB_PATH = os.environ.get("DB_PATH", str(BASE_DIR / "incidents.db"))
 HOLMES_URL = os.environ.get("HOLMES_URL", "http://localhost:10001")
+HOLMES_MODEL = os.environ.get("HOLMES_MODEL", "nvidia-deepseek")
 CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "incidentpilot-dev")
 K8S_NAME = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
 
@@ -115,8 +116,8 @@ def incident_detail(request: Request, incident_id: str):
 def ask_holmes(question: str) -> str:
     resp = httpx.post(
         f"{HOLMES_URL}/api/chat",
-        json={"ask": question},
-        timeout=httpx.Timeout(300, connect=10),
+        json={"ask": question, "model": HOLMES_MODEL},
+        timeout=httpx.Timeout(600, connect=10),
     )
     resp.raise_for_status()
     return resp.json().get("analysis", "(no analysis returned)")

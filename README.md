@@ -32,8 +32,9 @@ kubectl port-forward svc/robusta-holmes 10001:80 &   # Holmes API
 # open http://localhost:8010
 ```
 
-Env vars: `HOLMES_URL` (default `http://localhost:10001`), `CLUSTER_NAME`,
-`DB_PATH`.
+Env vars: `HOLMES_URL` (default `http://localhost:10001`), `HOLMES_MODEL`
+(default `nvidia-deepseek` — must name a model from Holmes' modelList,
+its built-in default may not be configured), `CLUSTER_NAME`, `DB_PATH`.
 
 ## Wire Robusta to the console
 

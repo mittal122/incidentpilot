@@ -1,0 +1,27 @@
+- generic [active] [ref=f5e1]:
+  - banner [ref=f5e2]:
+    - generic [ref=f5e3]: ⛑ incidentpilot
+    - navigation [ref=f5e4]:
+      - link "Incidents" [ref=f5e5] [cursor=pointer]:
+        - /url: /
+      - link "Ask Holmes" [ref=f5e6] [cursor=pointer]:
+        - /url: /chat
+    - generic [ref=f5e7]: "cluster: incidentpilot-dev"
+  - main [ref=f5e8]:
+    - link "← all incidents" [ref=f5e9] [cursor=pointer]:
+      - /url: /
+    - heading "HIGH Crashing pod crashy in namespace console-test" [level=1] [ref=f5e10]
+    - paragraph [ref=f5e11]: "console-test / crashy · 2026-08-29 10:30:24 UTC · status: restarted"
+    - generic [ref=f5e12]:
+      - heading "Enrichment (from Robusta)" [level=2] [ref=f5e13]
+      - generic [ref=f5e14]: (no description in alert payload)
+    - generic [ref=f5e15]:
+      - heading "Root cause (HolmesGPT)" [level=2] [ref=f5e16]
+      - button "🔎 Investigate with Holmes" [ref=f5e18] [cursor=pointer]
+    - generic [ref=f5e19]:
+      - heading "Actions" [level=2] [ref=f5e20]
+      - 'button "♻ Approve: restart pod crashy" [ref=f5e21] [cursor=pointer]'
+    - generic [ref=f5e22]:
+      - heading "Raw alert payload" [level=2] [ref=f5e23]
+      - group [ref=f5e24]:
+        - generic "show JSON" [ref=f5e25]

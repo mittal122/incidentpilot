@@ -1,0 +1,63 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ⛑ incidentpilot
+    - navigation [ref=e4]:
+      - link "Incidents" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - link "Ask Holmes" [ref=e6] [cursor=pointer]:
+        - /url: /chat
+    - generic [ref=e7]: "cluster: incidentpilot-dev"
+  - main [ref=e8]:
+    - heading "Incidents" [level=1] [ref=e9]
+    - table [ref=e10]:
+      - rowgroup [ref=e11]:
+        - row [ref=e12]:
+          - columnheader "Severity" [ref=e13]
+          - columnheader "Title" [ref=e14]
+          - columnheader "Namespace" [ref=e15]
+          - columnheader "Resource" [ref=e16]
+          - columnheader "Status" [ref=e17]
+          - columnheader "When" [ref=e18]
+      - rowgroup [ref=e19]:
+        - row [ref=e20] [cursor=pointer]:
+          - cell "HIGH" [ref=e21]
+          - cell "Failed to pull at least one image in pod bad-pod in namespace robusta-test" [ref=e22]
+          - cell "robusta-test" [ref=e23]
+          - cell "bad-pod" [ref=e24]
+          - cell "firing" [ref=e25]
+          - cell "2026-08-29 10:31:44 UTC" [ref=e26]
+        - row [ref=e27] [cursor=pointer]:
+          - cell "HIGH" [ref=e28]
+          - cell "Crashing pod checkout-d5bcbd854-qxn8v in namespace incidentpilot-demo" [ref=e29]
+          - cell "incidentpilot-demo" [ref=e30]
+          - cell "checkout-d5bcbd854-qxn8v" [ref=e31]
+          - cell "firing" [ref=e32]
+          - cell "2026-08-29 10:31:39 UTC" [ref=e33]
+        - row [ref=e34] [cursor=pointer]:
+          - cell "HIGH" [ref=e35]
+          - cell "Crashing pod backend-5685b85d86-vsp6b in namespace job-finder" [ref=e36]
+          - cell "job-finder" [ref=e37]
+          - cell "backend-5685b85d86-vsp6b" [ref=e38]
+          - cell "firing" [ref=e39]
+          - cell "2026-08-29 10:31:07 UTC" [ref=e40]
+        - row [ref=e41] [cursor=pointer]:
+          - cell "HIGH" [ref=e42]
+          - cell "Crashing pod crashy in namespace console-test" [ref=e43]
+          - cell "console-test" [ref=e44]
+          - cell "crashy" [ref=e45]
+          - cell "restarted" [ref=e46]
+          - cell "2026-08-29 10:30:24 UTC" [ref=e47]
+        - row [ref=e48] [cursor=pointer]:
+          - cell "HIGH" [ref=e49]
+          - cell "Crashing pod backend-8454c9b8bd-kvlj8 in namespace trading" [ref=e50]
+          - cell "trading" [ref=e51]
+          - cell "backend-8454c9b8bd-kvlj8" [ref=e52]
+          - cell "firing" [ref=e53]
+          - cell "2026-08-29 10:30:13 UTC" [ref=e54]
+        - row [ref=e55] [cursor=pointer]:
+          - cell "HIGH" [ref=e56]
+          - cell "CrashLoopBackOff on pod demo-app" [ref=e57]
+          - cell "robusta-test" [ref=e58]
+          - cell "demo-app-abc123" [ref=e59]
+          - cell "firing" [ref=e60]
+          - cell "2026-08-29 10:04:30 UTC" [ref=e61]
