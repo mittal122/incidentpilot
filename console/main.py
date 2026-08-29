@@ -31,6 +31,9 @@ K8S_NAME = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
 
 app = FastAPI(title="IncidentPilot Console")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+# project docs (architecture overview, screenshots); /docs is FastAPI's swagger
+app.mount("/project-docs", StaticFiles(directory=BASE_DIR.parent / "docs"),
+          name="project-docs")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 

@@ -1,0 +1,436 @@
+- generic [active] [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - heading "⛑ incidentpilot — Technical Architecture" [level=1] [ref=f1e3]
+    - paragraph [ref=f1e4]: "An open-source AI incident-response agent for Kubernetes: alerts are detected and enriched by Robusta, investigated by HolmesGPT, and presented — with human-approved remediation — in a purpose-built ops console."
+  - navigation [ref=f1e5]:
+    - link "1 Agents" [ref=f1e6] [cursor=pointer]:
+      - /url: "#agents"
+    - link "2 Application flow" [ref=f1e7] [cursor=pointer]:
+      - /url: "#flow"
+    - link "3 Components" [ref=f1e8] [cursor=pointer]:
+      - /url: "#components"
+    - link "4 Tech stack" [ref=f1e9] [cursor=pointer]:
+      - /url: "#stack"
+    - link "5 Agentic framework" [ref=f1e10] [cursor=pointer]:
+      - /url: "#framework"
+    - link "6 Purpose" [ref=f1e11] [cursor=pointer]:
+      - /url: "#purpose"
+    - link "7 Overall architecture" [ref=f1e12] [cursor=pointer]:
+      - /url: "#architecture"
+  - main [ref=f1e13]:
+    - generic [ref=f1e14]:
+      - heading "1. Agent Architecture" [level=2] [ref=f1e15]
+      - paragraph [ref=f1e16]:
+        - text: The system has
+        - strong [ref=f1e17]: one true AI agent
+        - text: plus two non-LLM automation actors and a human approval gate. We describe it honestly as a
+        - emphasis [ref=f1e18]: hybrid agent architecture
+        - text: — LLM reasoning where judgment is needed, deterministic code where reliability is needed.
+      - generic [ref=f1e19]:
+        - heading "🤖 HolmesGPT — the AI investigator (LLM agent)" [level=3] [ref=f1e20]
+        - paragraph [ref=f1e21]:
+          - strong [ref=f1e22]: "Responsibility:"
+          - text: "root-cause analysis. Given an alert or a free-form question, it runs an agentic tool-use loop: the LLM chooses tools ("
+          - code [ref=f1e23]: kubectl
+          - text: queries, pod logs, Prometheus metrics, Loki log search), reads the results, chooses again, and finally writes an explanation with evidence and a suggested fix. It is the only component that "thinks."
+      - generic [ref=f1e24]:
+        - heading "⚙️ Robusta runner — the reflex agent (rule-based, no LLM)" [level=3] [ref=f1e25]
+        - paragraph [ref=f1e26]:
+          - strong [ref=f1e27]: "Responsibility:"
+          - text: detection, enrichment, routing, and narrowly-scoped auto-remediation. It watches the Kubernetes API directly (via kubewatch) and receives Prometheus alerts, attaches context (pod logs, events, restart counts), fans findings out to sinks (Slack, the console webhook), and executes playbooks — e.g. auto-delete crash-looping pods, but only in namespaces prefixed
+          - code [ref=f1e28]: robusta-test
+          - text: .
+      - generic [ref=f1e29]:
+        - heading "🖥 Console — the orchestrator & approval gate (our code)" [level=3] [ref=f1e30]
+        - paragraph [ref=f1e31]:
+          - strong [ref=f1e32]: "Responsibility:"
+          - text: the human interface. Stores incidents, renders dashboards, proxies questions to Holmes, renders AI answers as rich UI, executes
+          - emphasis [ref=f1e33]: human-approved
+          - text: actions (restart pod) through the Kubernetes API, and manages which LLM provider Holmes uses.
+      - heading "How they communicate" [level=3] [ref=f1e34]
+      - table [ref=f1e35]:
+        - rowgroup [ref=f1e36]:
+          - row [ref=f1e37]:
+            - columnheader "Channel" [ref=f1e38]
+            - columnheader "From → To" [ref=f1e39]
+            - columnheader "Mechanism" [ref=f1e40]
+          - row [ref=f1e41]:
+            - cell "Alert webhook" [ref=f1e42]
+            - cell "Robusta → Console" [ref=f1e43]
+            - cell [ref=f1e44]:
+              - text: HTTP POST of enriched finding JSON to
+              - code [ref=f1e45]: /api/ingest
+              - text: (Robusta
+              - code [ref=f1e46]: webhook_sink
+              - text: )
+          - row [ref=f1e47]:
+            - cell "Investigation" [ref=f1e48]
+            - cell "Console → Holmes" [ref=f1e49]
+            - cell [ref=f1e50]:
+              - text: HTTP
+              - code [ref=f1e51]: POST /api/chat
+              - text: with the question and model alias; Holmes replies with the final analysis
+          - row [ref=f1e52]:
+            - cell "Tool calls" [ref=f1e53]
+            - cell "Holmes → cluster" [ref=f1e54]
+            - 'cell "Holmes'' own toolsets: Kubernetes API, Prometheus HTTP API, Loki HTTP API" [ref=f1e55]'
+          - row [ref=f1e56]:
+            - cell "Remediation" [ref=f1e57]
+            - cell "Console → cluster" [ref=f1e58]
+            - cell [ref=f1e59]:
+              - code [ref=f1e60]: kubectl
+              - text: (validated, human-click-gated)
+          - row [ref=f1e61]:
+            - cell "Provider switch" [ref=f1e62]
+            - cell "Console → Holmes" [ref=f1e63]
+            - cell [ref=f1e64]:
+              - text: Patch of Holmes'
+              - code [ref=f1e65]: model_list
+              - text: ConfigMap + rollout restart
+          - row [ref=f1e66]:
+            - cell "Notification" [ref=f1e67]
+            - cell "Robusta → humans" [ref=f1e68]
+            - cell "Slack sink (parallel to the console, unchanged)" [ref=f1e69]
+      - heading "Why hybrid instead of a single do-everything agent?" [level=3] [ref=f1e70]
+      - paragraph [ref=f1e71]:
+        - strong [ref=f1e72]: "Reliability:"
+        - text: detection must never miss an event; rule-based watchers are deterministic and cheap, while an LLM in the detection path would add latency, cost, and hallucination risk to the one stage that must be exact.
+        - strong [ref=f1e73]: "Cost & latency:"
+        - text: the LLM is invoked only when a human asks "why?" — not on every cluster event.
+        - strong [ref=f1e74]: "Safety:"
+        - text: mutations go through exactly one audited code path with human approval; the LLM can read everything but change nothing. Each actor does what its substrate is best at.
+    - generic [ref=f1e75]:
+      - heading "2. Application Flow" [level=2] [ref=f1e76]
+      - heading "Flow A — an incident happens (push path)" [level=3] [ref=f1e77]
+      - list [ref=f1e78]:
+        - listitem [ref=f1e79]:
+          - text: A pod in any namespace fails — e.g. crashes on startup because its database password is wrong → Kubernetes marks it
+          - generic [ref=f1e80]: CrashLoopBackOff
+          - text: .
+        - listitem [ref=f1e81]:
+          - strong [ref=f1e82]: "Detection:"
+          - text: Robusta's kubewatch sees the pod-state change within seconds (Prometheus alert rules fire in parallel for metric-based conditions and reach Robusta through Alertmanager).
+        - listitem [ref=f1e83]:
+          - strong [ref=f1e84]: "Enrichment:"
+          - text: the Robusta runner builds a
+          - emphasis [ref=f1e85]: finding
+          - text: ": title, severity, subject (namespace/pod/kind), recent logs, events."
+        - listitem [ref=f1e86]:
+          - strong [ref=f1e87]: "Fan-out:"
+          - text: the finding goes to Slack
+          - emphasis [ref=f1e88]: and
+          - text: is POSTed as JSON to the console's
+          - code [ref=f1e89]: /api/ingest
+          - text: ; the console stores it in SQLite.
+        - listitem [ref=f1e90]:
+          - strong [ref=f1e91]: "Display:"
+          - text: the Overview card grid and Incidents table (htmx, polling every 5–10 s) show the incident — critical namespaces sort first.
+        - listitem [ref=f1e92]:
+          - strong [ref=f1e93]: "Investigation (on demand):"
+          - text: the user clicks
+          - emphasis [ref=f1e94]: Investigate with Holmes
+          - text: . The console composes a prompt from the stored finding and calls Holmes'
+          - code [ref=f1e95]: /api/chat
+          - text: with the active model alias.
+        - listitem [ref=f1e96]:
+          - strong [ref=f1e97]: "Agentic loop:"
+          - text: "Holmes' LLM iterates: list pods → describe pod → fetch logs → (optionally) query Prometheus/Loki — each round is one LLM call choosing the next tool — then writes a root-cause analysis in Markdown."
+        - listitem [ref=f1e98]:
+          - strong [ref=f1e99]: "Rendering:"
+          - text: the console converts the Markdown to sanitized HTML (tables, code, colored status chips) and stores the analysis with the incident.
+        - listitem [ref=f1e100]:
+          - strong [ref=f1e101]: "Remediation:"
+          - text: if appropriate, the user clicks
+          - emphasis [ref=f1e102]: "Approve: restart pod"
+          - text: . The console validates the names against a strict regex and runs
+          - code [ref=f1e103]: kubectl delete pod
+          - text: ; the pod's Deployment recreates it. Nothing is ever executed without that click (outside the one whitelisted test-namespace playbook).
+      - heading "Flow B — the user asks a question (pull path)" [level=3] [ref=f1e104]
+      - list [ref=f1e105]:
+        - listitem [ref=f1e106]:
+          - text: User types into
+          - emphasis [ref=f1e107]: Ask Holmes
+          - text: ": \"Which pods are unhealthy right now?\" (htmx form POST to the console)."
+        - listitem [ref=f1e108]: The console appends a formatting hint (bold one-line summary first, tables for resources) and forwards to Holmes with the active provider's model.
+        - listitem [ref=f1e109]: Holmes runs the same tool loop against the live cluster — the answer reflects reality at that moment, not a cached index.
+        - listitem [ref=f1e110]: The response is Markdown-rendered, sanitized, badge-decorated, and appended to the chat log as a rich card.
+      - heading "Flow C — logs with AI explanation" [level=3] [ref=f1e111]
+      - paragraph [ref=f1e112]:
+        - text: "From any namespace page:"
+        - emphasis [ref=f1e113]: View Logs
+        - text: → raw
+        - code [ref=f1e114]: kubectl logs --tail=500
+        - text: in a color-coded terminal view (filter, copy, auto-refresh, previous-run for crashed containers). The
+        - emphasis [ref=f1e115]: AI Summary
+        - text: "tab sends the last 200 lines to Holmes (tools disabled — pure summarization) and renders a sectioned explanation: Summary / Key events / Warnings / Errors / Recommended actions."
+    - generic [ref=f1e116]:
+      - heading "3. System Components" [level=2] [ref=f1e117]
+      - table [ref=f1e118]:
+        - rowgroup [ref=f1e119]:
+          - row [ref=f1e120]:
+            - columnheader "Component" [ref=f1e121]
+            - columnheader "Purpose & responsibilities" [ref=f1e122]
+            - columnheader "Interacts with" [ref=f1e123]
+          - row [ref=f1e124]:
+            - cell "Frontend htmx + Jinja2" [ref=f1e125]:
+              - strong [ref=f1e126]: Frontend
+              - generic [ref=f1e127]: htmx + Jinja2
+            - 'cell "Server-rendered pages: namespace card overview, incident list/detail, chat, logs viewer, settings. htmx attributes provide polling, partial swaps, and form posts — no SPA build step, ~30 lines of hand-written JS total." [ref=f1e128]'
+            - cell "Console backend (HTML fragments)" [ref=f1e129]
+          - row [ref=f1e130]:
+            - cell "Console backend FastAPI" [ref=f1e131]:
+              - strong [ref=f1e132]: Console backend
+              - generic [ref=f1e133]: FastAPI
+            - cell [ref=f1e134]:
+              - text: Single Python service (
+              - code [ref=f1e135]: console/main.py
+              - text: "): webhook ingestion, incident store, Holmes proxy, Markdown/sanitize/badge rendering pipeline, namespace/pod introspection, log fetching, provider settings, remediation endpoint."
+            - cell "Everything" [ref=f1e136]
+          - row [ref=f1e137]:
+            - cell "Database SQLite" [ref=f1e138]:
+              - strong [ref=f1e139]: Database
+              - generic [ref=f1e140]: SQLite
+            - cell [ref=f1e141]:
+              - text: "Two tables:"
+              - code [ref=f1e142]: incidents
+              - text: (findings + stored investigations) and
+              - code [ref=f1e143]: providers
+              - text: (LLM configs, test results, usage). Zero-ops, single file, perfectly sized for one cluster's incident volume.
+            - cell "Console only" [ref=f1e144]
+          - row [ref=f1e145]:
+            - cell "AI / LLM layer HolmesGPT" [ref=f1e146]:
+              - strong [ref=f1e147]: AI / LLM layer
+              - generic [ref=f1e148]: HolmesGPT
+            - cell [ref=f1e149]:
+              - text: Runs in-cluster (
+              - code [ref=f1e150]: robusta-holmes
+              - text: "deployment). Agentic loop over litellm with toolsets: kubernetes/core, kubernetes/logs, prometheus/metrics, grafana/loki, bash. Model list is a ConfigMap — switchable at runtime."
+            - cell "Console (HTTP), cluster APIs, LLM providers" [ref=f1e151]
+          - row [ref=f1e152]:
+            - cell "Alert layer Robusta" [ref=f1e153]:
+              - strong [ref=f1e154]: Alert layer
+              - generic [ref=f1e155]: Robusta
+            - cell "Runner (playbooks, enrichment, sinks), forwarder/kubewatch (API-server watch), bundled kube-prometheus-stack (Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics)." [ref=f1e156]
+            - cell "Kubernetes API, Alertmanager, Slack, console webhook" [ref=f1e157]
+          - row [ref=f1e158]:
+            - cell "Log store Loki + promtail" [ref=f1e159]:
+              - strong [ref=f1e160]: Log store
+              - generic [ref=f1e161]: Loki + promtail
+            - cell "Cluster-wide log aggregation; Holmes queries it during investigations for historical log context beyond a pod's current buffer." [ref=f1e162]
+            - cell "Holmes toolset" [ref=f1e163]
+          - row [ref=f1e164]:
+            - cell [ref=f1e165]:
+              - strong [ref=f1e166]: Kubernetes integration
+            - cell [ref=f1e167]:
+              - text: Console shells out to
+              - code [ref=f1e168]: kubectl
+              - text: (pods listing, logs, delete-pod, ConfigMap patch) with regex-validated names and no shell interpolation. In-cluster deploys use a serviceaccount; locally it rides the user's kubeconfig.
+            - cell "Kubernetes API server" [ref=f1e169]
+          - row [ref=f1e170]:
+            - cell [ref=f1e171]:
+              - strong [ref=f1e172]: Settings / configuration
+            - 'cell "Settings page manages five LLM providers: save/mask keys, live Test Connection (validity + latency + model discovery), OpenRouter quota display, one-click Activate (ConfigMap patch + Holmes restart). Cluster-side config stays in Helm values." [ref=f1e173]'
+            - cell "Provider APIs, Holmes ConfigMap" [ref=f1e174]
+          - row [ref=f1e175]:
+            - cell "Auth none in v1" [ref=f1e176]:
+              - strong [ref=f1e177]: Auth
+              - generic [ref=f1e178]: none in v1
+            - 'cell "Deliberately absent — the console is a local/demo tool today. Before any shared deployment: put it behind an ingress with SSO/OAuth proxy, move keys to Secrets, add an audit log for actions." [ref=f1e179]'
+            - cell "—" [ref=f1e180]
+          - row [ref=f1e181]:
+            - cell [ref=f1e182]:
+              - strong [ref=f1e183]: Logging & monitoring
+            - cell "Prometheus/Grafana monitor the cluster itself (that's the alert source). Console logs to stdout via uvicorn; incidents table doubles as the action audit trail (status transitions)." [ref=f1e184]
+            - cell "—" [ref=f1e185]
+    - generic [ref=f1e186]:
+      - heading "4. Technology Stack" [level=2] [ref=f1e187]
+      - table [ref=f1e188]:
+        - rowgroup [ref=f1e189]:
+          - row [ref=f1e190]:
+            - columnheader "Layer" [ref=f1e191]
+            - columnheader "Choice" [ref=f1e192]
+            - columnheader "Why (vs. alternatives)" [ref=f1e193]
+          - row [ref=f1e194]:
+            - cell "Language" [ref=f1e195]
+            - cell "Python 3.12" [ref=f1e196]
+            - cell "Same language as both upstreams (Robusta, Holmes are Python) — one toolchain, and we can read/patch vendored code fluently." [ref=f1e197]
+          - row [ref=f1e198]:
+            - cell "Backend" [ref=f1e199]
+            - cell "FastAPI + uvicorn" [ref=f1e200]
+            - cell "Minimal ceremony, async-capable, first-class form/JSON handling. Flask lacks built-in validation; Django is far too heavy for a ~700-line service." [ref=f1e201]
+          - row [ref=f1e202]:
+            - cell "Frontend" [ref=f1e203]
+            - cell "htmx + Jinja2 + hand-written CSS" [ref=f1e204]
+            - cell "Server-rendered HTML with declarative polling/swaps. React/Next would add a build pipeline, state management, and an API serialization layer — none of which this UI needs. Premium look achieved with ~400 lines of CSS custom properties, no Tailwind build step." [ref=f1e205]
+          - row [ref=f1e206]:
+            - cell "State" [ref=f1e207]
+            - cell "None client-side" [ref=f1e208]
+            - cell "The server is the state; htmx re-fetches fragments. Eliminates an entire class of cache-staleness bugs." [ref=f1e209]
+          - row [ref=f1e210]:
+            - cell "Database" [ref=f1e211]
+            - cell [ref=f1e212]:
+              - text: SQLite (stdlib
+              - code [ref=f1e213]: sqlite3
+              - text: )
+            - cell "Zero-ops, transactional, single file. Postgres earns its keep at multi-user/multi-cluster scale — not before." [ref=f1e214]
+          - row [ref=f1e215]:
+            - cell "K8s client" [ref=f1e216]
+            - cell [ref=f1e217]:
+              - code [ref=f1e218]: kubectl
+              - text: via
+              - code [ref=f1e219]: subprocess
+            - cell [ref=f1e220]:
+              - text: Works identically with local kubeconfig and in-cluster serviceaccount; humans can replay every command the app runs. The
+              - code [ref=f1e221]: kubernetes
+              - text: Python client is the upgrade path if structured watches are ever needed.
+          - row [ref=f1e222]:
+            - cell "AI rendering" [ref=f1e223]
+            - cell "python-markdown + nh3" [ref=f1e224]
+            - cell "Server-side render keeps the client dumb; nh3 (Rust-based sanitizer) guards the trust boundary — log content is attacker-influenced and flows into AI output." [ref=f1e225]
+          - row [ref=f1e226]:
+            - cell "LLM gateway" [ref=f1e227]
+            - cell "litellm (inside Holmes)" [ref=f1e228]
+            - cell "One interface, 100+ providers — this is what makes the Settings page's five providers possible with a one-line model string each." [ref=f1e229]
+          - row [ref=f1e230]:
+            - cell "LLM provider" [ref=f1e231]
+            - cell [ref=f1e232]:
+              - text: NVIDIA NIM —
+              - code [ref=f1e233]: nemotron-3.5-lightning-30b-a3b
+              - text: (active), swappable to OpenRouter / Anthropic / OpenAI / Gemini
+            - 'cell "Benchmarked on the actual account: nemotron answered tool calls in ~2 s where DeepSeek endpoints hung (504s). Settings page switches providers at runtime." [ref=f1e234]'
+          - row [ref=f1e235]:
+            - cell "Alerting" [ref=f1e236]
+            - cell "Robusta 0.48 + kube-prometheus-stack" [ref=f1e237]
+            - cell "Robusta's enrichment + sink model beats raw Alertmanager webhooks (which carry no logs/events context)." [ref=f1e238]
+          - row [ref=f1e239]:
+            - cell "Logs" [ref=f1e240]
+            - cell "Loki + promtail (loki-stack chart)" [ref=f1e241]
+            - cell "Lightweight label-indexed log store; native Holmes toolset support." [ref=f1e242]
+          - row [ref=f1e243]:
+            - cell "Packaging / deploy" [ref=f1e244]
+            - cell "Helm 3, kind (dev cluster), Docker images from upstream" [ref=f1e245]
+            - cell "Helm is how both upstreams ship; values files are the single config surface." [ref=f1e246]
+          - row [ref=f1e247]:
+            - cell "CI/CD" [ref=f1e248]
+            - cell "not yet" [ref=f1e249]
+            - 'cell "Planned: GitHub Actions — lint + a smoke test that boots the console and replays a recorded webhook." [ref=f1e251]'
+    - generic [ref=f1e252]:
+      - heading "5. Agentic Framework" [level=2] [ref=f1e253]
+      - paragraph [ref=f1e254]:
+        - strong [ref=f1e255]: No external agentic framework
+        - text: — no LangChain, LangGraph, CrewAI, or AutoGen anywhere in the stack.
+      - heading "What we use instead" [level=3] [ref=f1e256]
+      - paragraph [ref=f1e257]:
+        - text: HolmesGPT ships its
+        - strong [ref=f1e258]: own purpose-built agentic loop
+        - text: (vendored in
+        - code [ref=f1e259]: vendor/holmesgpt
+        - text: "): litellm for provider-agnostic LLM calls, a curated registry of DevOps toolsets (kubectl, Prometheus, Loki, bash) exposed to the model as function-calling tools, iterative call→observe→call orchestration with token budgeting, and Kubernetes-aware system prompts refined by the Robusta team against real incidents."
+      - heading "Why not LangChain / CrewAI?" [level=3] [ref=f1e260]
+      - paragraph [ref=f1e261]:
+        - text: Three reasons.
+        - strong [ref=f1e262]: "(1) Nothing missing:"
+        - text: the loop Holmes implements — tool selection, iteration, structured output — is exactly the part frameworks abstract, already done, domain-tuned.
+        - strong [ref=f1e263]: "(2) Fewer layers:"
+        - text: frameworks add their own abstractions (chains, graphs, crews) between you and the LLM call; when an investigation misbehaves we read one loop in one file, not framework internals.
+        - strong [ref=f1e264]: "(3) Single-agent reality:"
+        - text: multi-agent frameworks earn their complexity when multiple LLM agents negotiate; our architecture intentionally has one reasoning agent surrounded by deterministic actors — a message-passing framework would be scaffolding with nothing to scaffold.
+      - paragraph [ref=f1e265]: "Console-side \"orchestration\" is deliberately plain code: a webhook handler, an HTTP proxy, and a rendering pipeline — readable in one sitting."
+    - generic [ref=f1e266]:
+      - heading "6. Purpose of the Application" [level=2] [ref=f1e267]
+      - heading "The problem" [level=3] [ref=f1e268]
+      - paragraph [ref=f1e269]: "When production breaks, engineers burn the first 20–40 minutes on archaeology: which pod, since when, what do the logs say, what changed. The evidence is scattered across kubectl, Prometheus, Loki, and Slack — and the person on call at 3 a.m. may not know the failing service."
+      - heading "What IncidentPilot does" [level=3] [ref=f1e270]
+      - table [ref=f1e271]:
+        - rowgroup [ref=f1e272]:
+          - row [ref=f1e273]:
+            - columnheader "Feature" [ref=f1e274]
+            - columnheader "Value" [ref=f1e275]
+          - row [ref=f1e276]:
+            - cell "Namespace card overview, critical-first" [ref=f1e277]
+            - cell "Cluster health in one glance; the worst problem is the first card" [ref=f1e278]
+          - row [ref=f1e279]:
+            - cell "Auto-captured, enriched incidents" [ref=f1e280]
+            - cell "No more \"when did this start?\" — the timeline builds itself" [ref=f1e281]
+          - row [ref=f1e282]:
+            - cell "One-click AI root-cause investigation" [ref=f1e283]
+            - cell "Minutes of kubectl archaeology → one button; answers cite actual log lines" [ref=f1e284]
+          - row [ref=f1e285]:
+            - cell "Ask Holmes chat" [ref=f1e286]
+            - cell "Plain-language questions against the live cluster" [ref=f1e287]
+          - row [ref=f1e288]:
+            - cell "Logs with AI explanation" [ref=f1e289]
+            - cell "Raw terminal view for experts, plain-English summary for everyone else" [ref=f1e290]
+          - row [ref=f1e291]:
+            - cell "Human-approved remediation" [ref=f1e292]
+            - cell "Fix from the same screen — with a person, not a model, pulling the trigger" [ref=f1e293]
+          - row [ref=f1e294]:
+            - cell "Provider settings" [ref=f1e295]
+            - cell "Swap the AI brain (5 providers) at runtime from the UI" [ref=f1e296]
+      - heading "Audience & differentiation" [level=3] [ref=f1e297]
+      - paragraph [ref=f1e298]:
+        - text: "Small platform/DevOps teams and solo developers running Kubernetes. Versus existing tools:"
+        - strong [ref=f1e299]: k9s/Lens
+        - text: show state but don't explain it;
+        - strong [ref=f1e300]: Datadog/New Relic
+        - text: explain more but are closed and priced per host;
+        - strong [ref=f1e301]: Robusta's own SaaS dashboard
+        - text: "is the closed piece of an otherwise open stack. IncidentPilot is the missing open-source layer: the full detect → explain → approve → fix loop, self-hosted, with the LLM provider under your control."
+    - generic [ref=f1e302]:
+      - heading "7. Overall Architecture" [level=2] [ref=f1e303]
+      - img [ref=f1e305]:
+        - generic [ref=f1e307]: "Kubernetes cluster (kind: helmsman)"
+        - generic [ref=f1e309]: Your applications
+        - generic [ref=f1e310]: trading · job-finder · testingtradingapp…
+        - generic [ref=f1e312]: kube-prometheus-stack
+        - generic [ref=f1e313]: Prometheus · Alertmanager
+        - generic [ref=f1e314]: Grafana · exporters
+        - generic [ref=f1e316]: Loki + promtail
+        - generic [ref=f1e317]: log aggregation
+        - generic [ref=f1e319]: ⚙️ Robusta runner
+        - generic [ref=f1e320]: detection · enrichment
+        - generic [ref=f1e321]: playbooks (test-ns auto-restart)
+        - generic [ref=f1e322]: "sinks: Slack + webhook"
+        - generic [ref=f1e324]: 🤖 HolmesGPT
+        - generic [ref=f1e325]: agentic loop (litellm)
+        - generic [ref=f1e326]: "tools: kubectl · logs · PromQL · Loki"
+        - generic [ref=f1e327]: model_list ConfigMap (swappable)
+        - generic [ref=f1e329]: 🖥 Console (ours)
+        - generic [ref=f1e330]: FastAPI + htmx + SQLite
+        - generic [ref=f1e331]: • Overview cards (critical-first)
+        - generic [ref=f1e332]: • Incidents + investigations
+        - generic [ref=f1e333]: • Ask Holmes chat
+        - generic [ref=f1e334]: "• Logs: raw + AI summary"
+        - generic [ref=f1e335]: • Approve-restart action
+        - generic [ref=f1e336]: "• Settings: 5 LLM providers"
+        - generic [ref=f1e337]: "rendering: markdown → nh3"
+        - generic [ref=f1e338]: → status chips
+        - generic [ref=f1e339]: 👤 Human approval gate
+        - generic [ref=f1e341]: LLM providers
+        - generic [ref=f1e342]: NVIDIA NIM · OpenRouter · Anthropic · OpenAI · Gemini
+        - generic [ref=f1e344]: "💬 Slack #all-autosre"
+        - generic [ref=f1e346]: pod events
+        - generic [ref=f1e348]: alerts
+        - generic [ref=f1e350]: webhook JSON
+        - generic [ref=f1e352]: /api/chat
+        - generic [ref=f1e356]: tools
+        - generic [ref=f1e357]: completions
+        - generic [ref=f1e359]: approved kubectl actions
+      - heading "The system in one paragraph" [level=3] [ref=f1e360]
+      - paragraph [ref=f1e361]:
+        - text: Applications run; Prometheus and kubewatch notice when they misbehave; Robusta enriches each event into a finding and pushes it to Slack and the console; the console stores and displays it as a live, critical-first health dashboard; when a human wants to know
+        - emphasis [ref=f1e362]: why
+        - text: ", one click sends the context to HolmesGPT, which investigates the actual cluster with real tools and returns an evidence-backed root cause rendered as rich UI; and when the fix is a restart, the human approves it and the console executes one validated kubectl command. The AI reasons, the rules react, the human decides."
+      - generic [ref=f1e363]:
+        - strong [ref=f1e364]: "Repo layout:"
+        - code [ref=f1e365]: vendor/robusta
+        - text: and
+        - code [ref=f1e366]: vendor/holmesgpt
+        - text: are full vendored sources (MIT) of the two upstream projects;
+        - code [ref=f1e367]: console/
+        - text: is our code (~700 lines Python, 8 templates, one stylesheet);
+        - code [ref=f1e368]: deploy/
+        - text: holds Helm value examples;
+        - code [ref=f1e369]: ./run.sh
+        - text: boots everything locally. Secrets live only in cluster-side Helm values / ConfigMaps, never in the repo — which is what keeps the project safely open-sourceable.
+  - contentinfo [ref=f1e370]: IncidentPilot — built on Robusta + HolmesGPT (both MIT) · console, integration & docs original work · 2026

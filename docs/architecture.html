@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncidentPilot — Technical Architecture Overview</title>
+<style>
+:root {
+  --bg:#0d1117; --panel:#161b22; --panel2:#1a2029; --border:#30363d;
+  --fg:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+  --ok:#3fb950; --warn:#d29922; --err:#f85149;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.65 system-ui,-apple-system,'Segoe UI',sans-serif; }
+header.hero { padding:3.5rem 2rem 2.5rem; text-align:center;
+  background:linear-gradient(180deg,#101725 0%, var(--bg) 100%);
+  border-bottom:1px solid var(--border); }
+.hero h1 { font-size:2.1rem; margin:0 0 .4rem; letter-spacing:-.02em; }
+.hero h1 .accent { color:var(--accent); }
+.hero p { color:var(--muted); max-width:720px; margin:.5rem auto 0; }
+nav.toc { position:sticky; top:0; background:rgba(13,17,23,.95); backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--border); padding:.6rem 1rem; text-align:center;
+  z-index:10; overflow-x:auto; white-space:nowrap; }
+nav.toc a { color:var(--muted); text-decoration:none; margin:0 .7rem; font-size:.85rem; }
+nav.toc a:hover { color:var(--accent); }
+main { max-width:960px; margin:0 auto; padding:1rem 1.5rem 4rem; }
+section { margin-top:3rem; }
+h2 { font-size:1.5rem; letter-spacing:-.01em; border-bottom:1px solid var(--border);
+  padding-bottom:.4rem; }
+h2 .num { color:var(--accent); }
+h3 { font-size:1.05rem; color:var(--accent); margin:1.6rem 0 .5rem; }
+p { margin:.6rem 0; }
+code { background:#0d1420; border:1px solid var(--border); border-radius:4px;
+  padding:.08rem .35rem; font-size:.85em; color:#79c0ff;
+  font-family:ui-monospace,Menlo,Consolas,monospace; }
+pre { background:#090c10; border:1px solid var(--border); border-radius:10px;
+  padding:1rem 1.2rem; overflow-x:auto; font-size:.83rem; line-height:1.55;
+  font-family:ui-monospace,Menlo,Consolas,monospace; }
+pre code { background:none; border:0; padding:0; color:#c9d1d9; }
+table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:.9rem; }
+th,td { border:1px solid var(--border); padding:.55rem .8rem; text-align:left;
+  vertical-align:top; }
+th { background:var(--panel2); color:var(--muted); font-size:.75rem;
+  text-transform:uppercase; letter-spacing:.05em; }
+tr:nth-child(even) td { background:rgba(255,255,255,.02); }
+.card { background:linear-gradient(180deg,var(--panel2) 0%,var(--panel) 100%);
+  border:1px solid var(--border); border-radius:12px; padding:1.1rem 1.4rem;
+  margin:1rem 0; }
+.card h3 { margin-top:0; }
+.chip { display:inline-block; padding:.06rem .55rem; border-radius:999px;
+  font-size:.75rem; font-weight:700; }
+.chip.ok { color:var(--ok); background:rgba(63,185,80,.13); }
+.chip.warn { color:var(--warn); background:rgba(210,153,34,.13); }
+.chip.err { color:var(--err); background:rgba(248,81,73,.15); }
+.callout { border-left:3px solid var(--warn); background:rgba(210,153,34,.07);
+  border-radius:0 10px 10px 0; padding:.7rem 1rem; margin:1rem 0; }
+.flow { counter-reset:step; list-style:none; padding:0; }
+.flow li { position:relative; padding:.65rem 0 .65rem 3.2rem; border-left:2px solid var(--border);
+  margin-left:1.1rem; }
+.flow li::before { counter-increment:step; content:counter(step);
+  position:absolute; left:-1.15rem; top:.7rem; width:2.1rem; height:2.1rem;
+  border-radius:50%; background:var(--panel2); border:1px solid var(--accent);
+  color:var(--accent); font-weight:700; display:flex; align-items:center;
+  justify-content:center; font-size:.85rem; }
+.diagram { overflow-x:auto; margin:1.2rem 0; }
+.diagram svg { min-width:820px; width:100%; height:auto; }
+footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
+  border-top:1px solid var(--border); }
+@media (max-width:640px){ .hero h1{font-size:1.5rem;} main{padding:1rem 1rem 3rem;} }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>⛑ incident<span class="accent">pilot</span> — Technical Architecture</h1>
+  <p>An open-source AI incident-response agent for Kubernetes: alerts are detected and enriched by Robusta, investigated by HolmesGPT, and presented — with human-approved remediation — in a purpose-built ops console.</p>
+</header>
+
+<nav class="toc">
+  <a href="#agents">1 Agents</a><a href="#flow">2 Application flow</a><a href="#components">3 Components</a><a href="#stack">4 Tech stack</a><a href="#framework">5 Agentic framework</a><a href="#purpose">6 Purpose</a><a href="#architecture">7 Overall architecture</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════ 1 AGENTS ══════════════════════ -->
+<section id="agents">
+<h2><span class="num">1.</span> Agent Architecture</h2>
+
+<p>The system has <strong>one true AI agent</strong> plus two non-LLM automation actors and a human approval gate. We describe it honestly as a <em>hybrid agent architecture</em> — LLM reasoning where judgment is needed, deterministic code where reliability is needed.</p>
+
+<div class="card">
+<h3>🤖 HolmesGPT — the AI investigator (LLM agent)</h3>
+<p><strong>Responsibility:</strong> root-cause analysis. Given an alert or a free-form question, it runs an agentic tool-use loop: the LLM chooses tools (<code>kubectl</code> queries, pod logs, Prometheus metrics, Loki log search), reads the results, chooses again, and finally writes an explanation with evidence and a suggested fix. It is the only component that "thinks."</p>
+</div>
+
+<div class="card">
+<h3>⚙️ Robusta runner — the reflex agent (rule-based, no LLM)</h3>
+<p><strong>Responsibility:</strong> detection, enrichment, routing, and narrowly-scoped auto-remediation. It watches the Kubernetes API directly (via kubewatch) and receives Prometheus alerts, attaches context (pod logs, events, restart counts), fans findings out to sinks (Slack, the console webhook), and executes playbooks — e.g. auto-delete crash-looping pods, but only in namespaces prefixed <code>robusta-test</code>.</p>
+</div>
+
+<div class="card">
+<h3>🖥 Console — the orchestrator &amp; approval gate (our code)</h3>
+<p><strong>Responsibility:</strong> the human interface. Stores incidents, renders dashboards, proxies questions to Holmes, renders AI answers as rich UI, executes <em>human-approved</em> actions (restart pod) through the Kubernetes API, and manages which LLM provider Holmes uses.</p>
+</div>
+
+<h3>How they communicate</h3>
+<table>
+<tr><th>Channel</th><th>From → To</th><th>Mechanism</th></tr>
+<tr><td>Alert webhook</td><td>Robusta → Console</td><td>HTTP POST of enriched finding JSON to <code>/api/ingest</code> (Robusta <code>webhook_sink</code>)</td></tr>
+<tr><td>Investigation</td><td>Console → Holmes</td><td>HTTP <code>POST /api/chat</code> with the question and model alias; Holmes replies with the final analysis</td></tr>
+<tr><td>Tool calls</td><td>Holmes → cluster</td><td>Holmes' own toolsets: Kubernetes API, Prometheus HTTP API, Loki HTTP API</td></tr>
+<tr><td>Remediation</td><td>Console → cluster</td><td><code>kubectl</code> (validated, human-click-gated)</td></tr>
+<tr><td>Provider switch</td><td>Console → Holmes</td><td>Patch of Holmes' <code>model_list</code> ConfigMap + rollout restart</td></tr>
+<tr><td>Notification</td><td>Robusta → humans</td><td>Slack sink (parallel to the console, unchanged)</td></tr>
+</table>
+
+<h3>Why hybrid instead of a single do-everything agent?</h3>
+<p><strong>Reliability:</strong> detection must never miss an event; rule-based watchers are deterministic and cheap, while an LLM in the detection path would add latency, cost, and hallucination risk to the one stage that must be exact. <strong>Cost &amp; latency:</strong> the LLM is invoked only when a human asks "why?" — not on every cluster event. <strong>Safety:</strong> mutations go through exactly one audited code path with human approval; the LLM can read everything but change nothing. Each actor does what its substrate is best at.</p>
+</section>
+
+<!-- ══════════════════════ 2 FLOW ══════════════════════ -->
+<section id="flow">
+<h2><span class="num">2.</span> Application Flow</h2>
+
+<h3>Flow A — an incident happens (push path)</h3>
+<ol class="flow">
+<li>A pod in any namespace fails — e.g. crashes on startup because its database password is wrong → Kubernetes marks it <span class="chip err">CrashLoopBackOff</span>.</li>
+<li><strong>Detection:</strong> Robusta's kubewatch sees the pod-state change within seconds (Prometheus alert rules fire in parallel for metric-based conditions and reach Robusta through Alertmanager).</li>
+<li><strong>Enrichment:</strong> the Robusta runner builds a <em>finding</em>: title, severity, subject (namespace/pod/kind), recent logs, events.</li>
+<li><strong>Fan-out:</strong> the finding goes to Slack <em>and</em> is POSTed as JSON to the console's <code>/api/ingest</code>; the console stores it in SQLite.</li>
+<li><strong>Display:</strong> the Overview card grid and Incidents table (htmx, polling every 5–10 s) show the incident — critical namespaces sort first.</li>
+<li><strong>Investigation (on demand):</strong> the user clicks <em>Investigate with Holmes</em>. The console composes a prompt from the stored finding and calls Holmes' <code>/api/chat</code> with the active model alias.</li>
+<li><strong>Agentic loop:</strong> Holmes' LLM iterates: list pods → describe pod → fetch logs → (optionally) query Prometheus/Loki — each round is one LLM call choosing the next tool — then writes a root-cause analysis in Markdown.</li>
+<li><strong>Rendering:</strong> the console converts the Markdown to sanitized HTML (tables, code, colored status chips) and stores the analysis with the incident.</li>
+<li><strong>Remediation:</strong> if appropriate, the user clicks <em>Approve: restart pod</em>. The console validates the names against a strict regex and runs <code>kubectl delete pod</code>; the pod's Deployment recreates it. Nothing is ever executed without that click (outside the one whitelisted test-namespace playbook).</li>
+</ol>
+
+<h3>Flow B — the user asks a question (pull path)</h3>
+<ol class="flow">
+<li>User types into <em>Ask Holmes</em>: "Which pods are unhealthy right now?" (htmx form POST to the console).</li>
+<li>The console appends a formatting hint (bold one-line summary first, tables for resources) and forwards to Holmes with the active provider's model.</li>
+<li>Holmes runs the same tool loop against the live cluster — the answer reflects reality at that moment, not a cached index.</li>
+<li>The response is Markdown-rendered, sanitized, badge-decorated, and appended to the chat log as a rich card.</li>
+</ol>
+
+<h3>Flow C — logs with AI explanation</h3>
+<p>From any namespace page: <em>View Logs</em> → raw <code>kubectl logs --tail=500</code> in a color-coded terminal view (filter, copy, auto-refresh, previous-run for crashed containers). The <em>AI Summary</em> tab sends the last 200 lines to Holmes (tools disabled — pure summarization) and renders a sectioned explanation: Summary / Key events / Warnings / Errors / Recommended actions.</p>
+</section>
+
+<!-- ══════════════════════ 3 COMPONENTS ══════════════════════ -->
+<section id="components">
+<h2><span class="num">3.</span> System Components</h2>
+
+<table>
+<tr><th>Component</th><th>Purpose &amp; responsibilities</th><th>Interacts with</th></tr>
+<tr><td><strong>Frontend</strong><br><span class="chip ok">htmx + Jinja2</span></td>
+<td>Server-rendered pages: namespace card overview, incident list/detail, chat, logs viewer, settings. htmx attributes provide polling, partial swaps, and form posts — no SPA build step, ~30 lines of hand-written JS total.</td>
+<td>Console backend (HTML fragments)</td></tr>
+<tr><td><strong>Console backend</strong><br><span class="chip ok">FastAPI</span></td>
+<td>Single Python service (<code>console/main.py</code>): webhook ingestion, incident store, Holmes proxy, Markdown/sanitize/badge rendering pipeline, namespace/pod introspection, log fetching, provider settings, remediation endpoint.</td>
+<td>Everything</td></tr>
+<tr><td><strong>Database</strong><br><span class="chip ok">SQLite</span></td>
+<td>Two tables: <code>incidents</code> (findings + stored investigations) and <code>providers</code> (LLM configs, test results, usage). Zero-ops, single file, perfectly sized for one cluster's incident volume.</td>
+<td>Console only</td></tr>
+<tr><td><strong>AI / LLM layer</strong><br><span class="chip ok">HolmesGPT</span></td>
+<td>Runs in-cluster (<code>robusta-holmes</code> deployment). Agentic loop over litellm with toolsets: kubernetes/core, kubernetes/logs, prometheus/metrics, grafana/loki, bash. Model list is a ConfigMap — switchable at runtime.</td>
+<td>Console (HTTP), cluster APIs, LLM providers</td></tr>
+<tr><td><strong>Alert layer</strong><br><span class="chip ok">Robusta</span></td>
+<td>Runner (playbooks, enrichment, sinks), forwarder/kubewatch (API-server watch), bundled kube-prometheus-stack (Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics).</td>
+<td>Kubernetes API, Alertmanager, Slack, console webhook</td></tr>
+<tr><td><strong>Log store</strong><br><span class="chip ok">Loki + promtail</span></td>
+<td>Cluster-wide log aggregation; Holmes queries it during investigations for historical log context beyond a pod's current buffer.</td>
+<td>Holmes toolset</td></tr>
+<tr><td><strong>Kubernetes integration</strong></td>
+<td>Console shells out to <code>kubectl</code> (pods listing, logs, delete-pod, ConfigMap patch) with regex-validated names and no shell interpolation. In-cluster deploys use a serviceaccount; locally it rides the user's kubeconfig.</td>
+<td>Kubernetes API server</td></tr>
+<tr><td><strong>Settings / configuration</strong></td>
+<td>Settings page manages five LLM providers: save/mask keys, live Test Connection (validity + latency + model discovery), OpenRouter quota display, one-click Activate (ConfigMap patch + Holmes restart). Cluster-side config stays in Helm values.</td>
+<td>Provider APIs, Holmes ConfigMap</td></tr>
+<tr><td><strong>Auth</strong><br><span class="chip warn">none in v1</span></td>
+<td>Deliberately absent — the console is a local/demo tool today. Before any shared deployment: put it behind an ingress with SSO/OAuth proxy, move keys to Secrets, add an audit log for actions.</td>
+<td>—</td></tr>
+<tr><td><strong>Logging &amp; monitoring</strong></td>
+<td>Prometheus/Grafana monitor the cluster itself (that's the alert source). Console logs to stdout via uvicorn; incidents table doubles as the action audit trail (status transitions).</td>
+<td>—</td></tr>
+</table>
+</section>
+
+<!-- ══════════════════════ 4 STACK ══════════════════════ -->
+<section id="stack">
+<h2><span class="num">4.</span> Technology Stack</h2>
+
+<table>
+<tr><th>Layer</th><th>Choice</th><th>Why (vs. alternatives)</th></tr>
+<tr><td>Language</td><td>Python 3.12</td><td>Same language as both upstreams (Robusta, Holmes are Python) — one toolchain, and we can read/patch vendored code fluently.</td></tr>
+<tr><td>Backend</td><td>FastAPI + uvicorn</td><td>Minimal ceremony, async-capable, first-class form/JSON handling. Flask lacks built-in validation; Django is far too heavy for a ~700-line service.</td></tr>
+<tr><td>Frontend</td><td>htmx + Jinja2 + hand-written CSS</td><td>Server-rendered HTML with declarative polling/swaps. React/Next would add a build pipeline, state management, and an API serialization layer — none of which this UI needs. Premium look achieved with ~400 lines of CSS custom properties, no Tailwind build step.</td></tr>
+<tr><td>State</td><td>None client-side</td><td>The server is the state; htmx re-fetches fragments. Eliminates an entire class of cache-staleness bugs.</td></tr>
+<tr><td>Database</td><td>SQLite (stdlib <code>sqlite3</code>)</td><td>Zero-ops, transactional, single file. Postgres earns its keep at multi-user/multi-cluster scale — not before.</td></tr>
+<tr><td>K8s client</td><td><code>kubectl</code> via <code>subprocess</code></td><td>Works identically with local kubeconfig and in-cluster serviceaccount; humans can replay every command the app runs. The <code>kubernetes</code> Python client is the upgrade path if structured watches are ever needed.</td></tr>
+<tr><td>AI rendering</td><td>python-markdown + nh3</td><td>Server-side render keeps the client dumb; nh3 (Rust-based sanitizer) guards the trust boundary — log content is attacker-influenced and flows into AI output.</td></tr>
+<tr><td>LLM gateway</td><td>litellm (inside Holmes)</td><td>One interface, 100+ providers — this is what makes the Settings page's five providers possible with a one-line model string each.</td></tr>
+<tr><td>LLM provider</td><td>NVIDIA NIM — <code>nemotron-3.5-lightning-30b-a3b</code> (active), swappable to OpenRouter / Anthropic / OpenAI / Gemini</td><td>Benchmarked on the actual account: nemotron answered tool calls in ~2 s where DeepSeek endpoints hung (504s). Settings page switches providers at runtime.</td></tr>
+<tr><td>Alerting</td><td>Robusta 0.48 + kube-prometheus-stack</td><td>Robusta's enrichment + sink model beats raw Alertmanager webhooks (which carry no logs/events context).</td></tr>
+<tr><td>Logs</td><td>Loki + promtail (loki-stack chart)</td><td>Lightweight label-indexed log store; native Holmes toolset support.</td></tr>
+<tr><td>Packaging / deploy</td><td>Helm 3, kind (dev cluster), Docker images from upstream</td><td>Helm is how both upstreams ship; values files are the single config surface.</td></tr>
+<tr><td>CI/CD</td><td><span class="chip warn">not yet</span></td><td>Planned: GitHub Actions — lint + a smoke test that boots the console and replays a recorded webhook.</td></tr>
+</table>
+</section>
+
+<!-- ══════════════════════ 5 FRAMEWORK ══════════════════════ -->
+<section id="framework">
+<h2><span class="num">5.</span> Agentic Framework</h2>
+
+<p><strong>No external agentic framework</strong> — no LangChain, LangGraph, CrewAI, or AutoGen anywhere in the stack.</p>
+
+<h3>What we use instead</h3>
+<p>HolmesGPT ships its <strong>own purpose-built agentic loop</strong> (vendored in <code>vendor/holmesgpt</code>): litellm for provider-agnostic LLM calls, a curated registry of DevOps toolsets (kubectl, Prometheus, Loki, bash) exposed to the model as function-calling tools, iterative call→observe→call orchestration with token budgeting, and Kubernetes-aware system prompts refined by the Robusta team against real incidents.</p>
+
+<h3>Why not LangChain / CrewAI?</h3>
+<p>Three reasons. <strong>(1) Nothing missing:</strong> the loop Holmes implements — tool selection, iteration, structured output — is exactly the part frameworks abstract, already done, domain-tuned. <strong>(2) Fewer layers:</strong> frameworks add their own abstractions (chains, graphs, crews) between you and the LLM call; when an investigation misbehaves we read one loop in one file, not framework internals. <strong>(3) Single-agent reality:</strong> multi-agent frameworks earn their complexity when multiple LLM agents negotiate; our architecture intentionally has one reasoning agent surrounded by deterministic actors — a message-passing framework would be scaffolding with nothing to scaffold.</p>
+<p>Console-side "orchestration" is deliberately plain code: a webhook handler, an HTTP proxy, and a rendering pipeline — readable in one sitting.</p>
+</section>
+
+<!-- ══════════════════════ 6 PURPOSE ══════════════════════ -->
+<section id="purpose">
+<h2><span class="num">6.</span> Purpose of the Application</h2>
+
+<h3>The problem</h3>
+<p>When production breaks, engineers burn the first 20–40 minutes on archaeology: which pod, since when, what do the logs say, what changed. The evidence is scattered across kubectl, Prometheus, Loki, and Slack — and the person on call at 3 a.m. may not know the failing service.</p>
+
+<h3>What IncidentPilot does</h3>
+<table>
+<tr><th>Feature</th><th>Value</th></tr>
+<tr><td>Namespace card overview, critical-first</td><td>Cluster health in one glance; the worst problem is the first card</td></tr>
+<tr><td>Auto-captured, enriched incidents</td><td>No more "when did this start?" — the timeline builds itself</td></tr>
+<tr><td>One-click AI root-cause investigation</td><td>Minutes of kubectl archaeology → one button; answers cite actual log lines</td></tr>
+<tr><td>Ask Holmes chat</td><td>Plain-language questions against the live cluster</td></tr>
+<tr><td>Logs with AI explanation</td><td>Raw terminal view for experts, plain-English summary for everyone else</td></tr>
+<tr><td>Human-approved remediation</td><td>Fix from the same screen — with a person, not a model, pulling the trigger</td></tr>
+<tr><td>Provider settings</td><td>Swap the AI brain (5 providers) at runtime from the UI</td></tr>
+</table>
+
+<h3>Audience &amp; differentiation</h3>
+<p>Small platform/DevOps teams and solo developers running Kubernetes. Versus existing tools: <strong>k9s/Lens</strong> show state but don't explain it; <strong>Datadog/New Relic</strong> explain more but are closed and priced per host; <strong>Robusta's own SaaS dashboard</strong> is the closed piece of an otherwise open stack. IncidentPilot is the missing open-source layer: the full detect → explain → approve → fix loop, self-hosted, with the LLM provider under your control.</p>
+</section>
+
+<!-- ══════════════════════ 7 ARCHITECTURE ══════════════════════ -->
+<section id="architecture">
+<h2><span class="num">7.</span> Overall Architecture</h2>
+
+<div class="diagram">
+<svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/>
+    </marker>
+  </defs>
+
+  <!-- cluster boundary -->
+  <rect x="20" y="20" width="560" height="520" rx="14" fill="none" stroke="#30363d" stroke-dasharray="6 5"/>
+  <text x="40" y="48" fill="#8b949e" font-size="13">Kubernetes cluster (kind: helmsman)</text>
+
+  <!-- workloads -->
+  <rect x="45" y="70" width="220" height="70" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="98" fill="#e6edf3" font-size="14" font-weight="600">Your applications</text>
+  <text x="60" y="120" fill="#8b949e" font-size="12">trading · job-finder · testingtradingapp…</text>
+
+  <!-- prometheus -->
+  <rect x="45" y="180" width="220" height="86" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="208" fill="#e6edf3" font-size="14" font-weight="600">kube-prometheus-stack</text>
+  <text x="60" y="228" fill="#8b949e" font-size="12">Prometheus · Alertmanager</text>
+  <text x="60" y="246" fill="#8b949e" font-size="12">Grafana · exporters</text>
+
+  <!-- loki -->
+  <rect x="45" y="300" width="220" height="60" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="60" y="326" fill="#e6edf3" font-size="14" font-weight="600">Loki + promtail</text>
+  <text x="60" y="346" fill="#8b949e" font-size="12">log aggregation</text>
+
+  <!-- robusta -->
+  <rect x="330" y="150" width="220" height="110" rx="10" fill="#1a2433" stroke="#58a6ff"/>
+  <text x="345" y="178" fill="#e6edf3" font-size="14" font-weight="600">⚙️ Robusta runner</text>
+  <text x="345" y="198" fill="#8b949e" font-size="12">detection · enrichment</text>
+  <text x="345" y="216" fill="#8b949e" font-size="12">playbooks (test-ns auto-restart)</text>
+  <text x="345" y="234" fill="#8b949e" font-size="12">sinks: Slack + webhook</text>
+
+  <!-- holmes -->
+  <rect x="330" y="320" width="220" height="110" rx="10" fill="#15241c" stroke="#3fb950"/>
+  <text x="345" y="348" fill="#e6edf3" font-size="14" font-weight="600">🤖 HolmesGPT</text>
+  <text x="345" y="368" fill="#8b949e" font-size="12">agentic loop (litellm)</text>
+  <text x="345" y="386" fill="#8b949e" font-size="12">tools: kubectl · logs · PromQL · Loki</text>
+  <text x="345" y="404" fill="#8b949e" font-size="12">model_list ConfigMap (swappable)</text>
+
+  <!-- console -->
+  <rect x="640" y="150" width="230" height="280" rx="12" fill="#1a2029" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="658" y="180" fill="#e6edf3" font-size="15" font-weight="700">🖥 Console (ours)</text>
+  <text x="658" y="204" fill="#8b949e" font-size="12">FastAPI + htmx + SQLite</text>
+  <text x="658" y="230" fill="#c9d1d9" font-size="12">• Overview cards (critical-first)</text>
+  <text x="658" y="250" fill="#c9d1d9" font-size="12">• Incidents + investigations</text>
+  <text x="658" y="270" fill="#c9d1d9" font-size="12">• Ask Holmes chat</text>
+  <text x="658" y="290" fill="#c9d1d9" font-size="12">• Logs: raw + AI summary</text>
+  <text x="658" y="310" fill="#c9d1d9" font-size="12">• Approve-restart action</text>
+  <text x="658" y="330" fill="#c9d1d9" font-size="12">• Settings: 5 LLM providers</text>
+  <text x="658" y="358" fill="#8b949e" font-size="12">rendering: markdown → nh3</text>
+  <text x="658" y="376" fill="#8b949e" font-size="12">→ status chips</text>
+  <text x="658" y="404" fill="#e6edf3" font-size="13" font-weight="600">👤 Human approval gate</text>
+
+  <!-- LLM providers -->
+  <rect x="640" y="470" width="230" height="60" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="658" y="494" fill="#e6edf3" font-size="13" font-weight="600">LLM providers</text>
+  <text x="658" y="514" fill="#8b949e" font-size="11">NVIDIA NIM · OpenRouter · Anthropic · OpenAI · Gemini</text>
+
+  <!-- slack -->
+  <rect x="330" y="60" width="220" height="50" rx="10" fill="#161b22" stroke="#30363d"/>
+  <text x="345" y="90" fill="#e6edf3" font-size="13" font-weight="600">💬 Slack #all-autosre</text>
+
+  <!-- arrows -->
+  <line x1="265" y1="105" x2="330" y2="180" stroke="#58a6ff" marker-end="url(#arr)"/>
+  <text x="255" y="140" fill="#8b949e" font-size="11">pod events</text>
+  <line x1="265" y1="215" x2="330" y2="205" stroke="#58a6ff" marker-end="url(#arr)"/>
+  <text x="272" y="200" fill="#8b949e" font-size="11">alerts</text>
+  <line x1="440" y1="150" x2="440" y2="110" stroke="#58a6ff" marker-end="url(#arr)"/>
+  <line x1="550" y1="205" x2="640" y2="230" stroke="#58a6ff" marker-end="url(#arr)"/>
+  <text x="556" y="205" fill="#8b949e" font-size="11">webhook JSON</text>
+  <line x1="640" y1="330" x2="550" y2="360" stroke="#3fb950" marker-end="url(#arrg)"/>
+  <text x="548" y="310" fill="#8b949e" font-size="11">/api/chat</text>
+  <line x1="330" y1="380" x2="265" y2="330" stroke="#3fb950" marker-end="url(#arrg)"/>
+  <line x1="330" y1="360" x2="265" y2="240" stroke="#3fb950" marker-end="url(#arrg)"/>
+  <line x1="380" y1="320" x2="230" y2="140" stroke="#3fb950" marker-end="url(#arrg)"/>
+  <text x="240" y="285" fill="#8b949e" font-size="11">tools</text>
+  <line x1="755" y1="430" x2="755" y2="470" stroke="#58a6ff" marker-end="url(#arr)"/>
+  <line x1="465" y1="430" x2="465" y2="470" stroke="#3fb950" marker-end="url(#arrg)"/>
+  <line x1="465" y1="500" x2="640" y2="500" stroke="#3fb950"/>
+  <text x="470" y="492" fill="#8b949e" font-size="11">completions</text>
+  <line x1="640" y1="410" x2="180" y2="140" stroke="#f85149" marker-end="url(#arr)"/>
+  <text x="300" y="128" fill="#f85149" font-size="11">approved kubectl actions</text>
+</svg>
+</div>
+
+<h3>The system in one paragraph</h3>
+<p>Applications run; Prometheus and kubewatch notice when they misbehave; Robusta enriches each event into a finding and pushes it to Slack and the console; the console stores and displays it as a live, critical-first health dashboard; when a human wants to know <em>why</em>, one click sends the context to HolmesGPT, which investigates the actual cluster with real tools and returns an evidence-backed root cause rendered as rich UI; and when the fix is a restart, the human approves it and the console executes one validated kubectl command. The AI reasons, the rules react, the human decides.</p>
+
+<div class="callout">
+<strong>Repo layout:</strong> <code>vendor/robusta</code> and <code>vendor/holmesgpt</code> are full vendored sources (MIT) of the two upstream projects; <code>console/</code> is our code (~700 lines Python, 8 templates, one stylesheet); <code>deploy/</code> holds Helm value examples; <code>./run.sh</code> boots everything locally. Secrets live only in cluster-side Helm values / ConfigMaps, never in the repo — which is what keeps the project safely open-sourceable.
+</div>
+</section>
+
+</main>
+
+<footer>
+IncidentPilot — built on Robusta + HolmesGPT (both MIT) · console, integration &amp; docs original work · 2026
+</footer>
+
+</body>
+</html>
