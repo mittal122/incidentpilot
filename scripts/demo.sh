@@ -71,7 +71,11 @@ recover() {
   # delete scenario-only workloads (labeled demo-failure), keep baseline
   kubectl delete deploy,pod -n "$NS" -l demo-failure --ignore-not-found --wait=false 2>/dev/null || true
   kubectl delete namespace "$AUTONS" --ignore-not-found --wait=false 2>/dev/null || true
-  # re-apply baseline: undoes image/command patches and scale changes
+  # delete baseline deployments before re-apply: `kubectl apply` cannot remove
+  # fields added by `kubectl patch` (three-way merge only prunes fields that
+  # were in last-applied-configuration), so a patched-in crash command would
+  # survive a plain re-apply. Delete + recreate guarantees the exact spec.
+  kubectl delete deploy webshop cart -n "$NS" --ignore-not-found >/dev/null 2>&1 || true
   baseline
   kubectl scale deploy/webshop -n "$NS" --replicas=2 >/dev/null 2>&1 || true
   kubectl scale deploy/cart -n "$NS" --replicas=1 >/dev/null 2>&1 || true
