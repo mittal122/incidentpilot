@@ -1,0 +1,24 @@
+{% for c in cards %}
+<a class="ns-card {{ c.status }}" href="/ns/{{ c.name }}">
+  <div class="ns-card-head">
+    <span class="status-dot {{ c.status }}"></span>
+    <span class="ns-name">{{ c.name }}</span>
+    <span class="pill {{ c.status }}">{{ c.status_label }}</span>
+  </div>
+  <div class="ns-card-hero">
+    <span class="hero-num">{{ c.healthy }}<span class="hero-of">/{{ c.total }}</span></span>
+    <span class="hero-label">pods healthy</span>
+  </div>
+  <div class="ns-card-metrics">
+    <div class="metric"><span class="m-num {% if c.restarts > 10 %}warn-text{% endif %}">{{ c.restarts }}</span><span class="m-label">restarts</span></div>
+    <div class="metric"><span class="m-num {% if c.incidents_24h %}warn-text{% endif %}">{{ c.incidents_24h }}</span><span class="m-label">incidents 24h</span></div>
+    <div class="metric"><span class="m-num">{{ c.images }}</span><span class="m-label">images</span></div>
+  </div>
+  <div class="ns-card-foot">
+    <span>live {{ c.live_since }}</span>
+    {% if c.problem %}<span class="foot-problem">{{ c.problem }}</span>{% endif %}
+  </div>
+</a>
+{% else %}
+<p class="muted empty">No namespaces visible — is kubectl reachable?</p>
+{% endfor %}

@@ -59,3 +59,47 @@ input[type=text] { flex: 1; background: var(--panel); border: 1px solid var(--bo
 .explain-row td { color: var(--muted); font-style: italic; border-bottom: 1px solid var(--border); }
 a.ns-link { color: var(--accent); text-decoration: none; }
 a.ns-link:hover { text-decoration: underline; }
+
+/* ── namespace card grid (home) ─────────────────────────────────── */
+.page-head { margin-bottom: 1.6rem; }
+.page-head h1 { margin: 0 0 .2rem; letter-spacing: -.02em; }
+.page-head p { margin: 0; }
+.ns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1.1rem; }
+.ns-card { display: block; text-decoration: none; color: var(--fg);
+  background: linear-gradient(180deg, #1a2029 0%, var(--panel) 100%);
+  border: 1px solid var(--border); border-radius: 14px; padding: 1.15rem 1.25rem;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.ns-card:hover { transform: translateY(-3px); border-color: #4d5866;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .45); }
+.ns-card.crit { border-color: rgba(248, 81, 73, .4); }
+.ns-card.crit:hover { border-color: var(--high); }
+.ns-card-head { display: flex; align-items: center; gap: .55rem; }
+.ns-name { font-weight: 650; font-size: 1.02rem; letter-spacing: -.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.status-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.status-dot.ok   { background: var(--ok);   box-shadow: 0 0 8px rgba(63, 185, 80, .8); }
+.status-dot.warn { background: var(--low);  box-shadow: 0 0 8px rgba(210, 153, 34, .8); }
+.status-dot.crit { background: var(--high); box-shadow: 0 0 8px rgba(248, 81, 73, .8);
+  animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+.pill { flex: none; font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; padding: .18rem .55rem; border-radius: 999px; }
+.pill.ok   { color: var(--ok);   background: rgba(63, 185, 80, .12); }
+.pill.warn { color: var(--low);  background: rgba(210, 153, 34, .12); }
+.pill.crit { color: var(--high); background: rgba(248, 81, 73, .14); }
+.ns-card-hero { margin: 1.05rem 0 .9rem; display: flex; align-items: baseline; gap: .5rem; }
+.hero-num { font-size: 2.1rem; font-weight: 750; letter-spacing: -.03em; line-height: 1; }
+.hero-of { color: var(--muted); font-size: 1.25rem; font-weight: 500; }
+.hero-label { color: var(--muted); font-size: .8rem; text-transform: uppercase;
+  letter-spacing: .05em; }
+.ns-card-metrics { display: flex; border-top: 1px solid var(--border);
+  padding-top: .8rem; }
+.metric { flex: 1; display: flex; flex-direction: column; gap: .05rem; }
+.m-num { font-weight: 700; font-size: 1.05rem; }
+.m-label { color: var(--muted); font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .04em; }
+.ns-card-foot { display: flex; justify-content: space-between; margin-top: .85rem;
+  color: var(--muted); font-size: .78rem; }
+.foot-problem { color: var(--high); font-weight: 600; }
+@media (max-width: 640px) { .ns-grid { grid-template-columns: 1fr; } main { margin-top: 1rem; } }

@@ -10,7 +10,7 @@ import re
 import sqlite3
 import subprocess
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -89,6 +89,24 @@ def fetch_incidents():
 
 
 @app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    try:
+        cards = cluster_overview()
+    except Exception:
+        cards = []
+    return render(request, "home.html", page="home", cards=cards)
+
+
+@app.get("/partials/namespaces", response_class=HTMLResponse)
+def namespace_cards(request: Request):
+    try:
+        cards = cluster_overview()
+    except Exception:
+        cards = []
+    return render(request, "_ns_cards.html", cards=cards)
+
+
+@app.get("/incidents", response_class=HTMLResponse)
 def index(request: Request):
     return render(request, "index.html", page="incidents", incidents=fetch_incidents())
 
@@ -198,54 +216,108 @@ def humanize_age(start_iso: str | None) -> str:
     return f"{secs // 86400}d"
 
 
-def namespace_pods(namespace: str) -> list[dict]:
+def parse_pod(item: dict) -> dict:
+    statuses = item.get("status", {}).get("containerStatuses", [])
+    restarts = sum(s.get("restartCount", 0) for s in statuses)
+    ready = sum(1 for s in statuses if s.get("ready"))
+    # find the current problem reason, if any
+    reason = None
+    for s in statuses:
+        state = s.get("state", {})
+        if "waiting" in state:
+            reason = state["waiting"].get("reason")
+        elif "terminated" in state:
+            reason = state["terminated"].get("reason")
+        if reason:
+            break
+    phase = item["status"].get("phase", "Unknown")
+    if reason is None and phase == "Pending":
+        reason = "Pending"
+    started = item["status"].get("startTime")
+    # uptime of the current run = newest container start (resets on restart)
+    run_starts = [
+        s["state"]["running"]["startedAt"]
+        for s in statuses if "running" in s.get("state", {})
+    ]
+    healthy = phase == "Running" and ready == len(statuses) and not reason
+    return {
+        "name": item["metadata"]["name"],
+        "namespace": item["metadata"]["namespace"],
+        "phase": phase,
+        "ready": f"{ready}/{len(statuses)}",
+        "restarts": restarts,
+        "started": started,
+        "age": humanize_age(started),
+        "uptime": humanize_age(max(run_starts)) if run_starts else "—",
+        "images": [s.get("image", "?") for s in statuses],
+        "reason": reason,
+        "simple_error": SIMPLE_ERRORS.get(
+            reason, f"Problem state: {reason}" if reason else None
+        ),
+        "healthy": healthy,
+    }
+
+
+def kubectl_pods(*args: str) -> list[dict]:
     out = subprocess.run(
-        ["kubectl", "get", "pods", "-n", namespace, "-o", "json"],
+        ["kubectl", "get", "pods", *args, "-o", "json"],
         capture_output=True, text=True, timeout=30,
     )
     if out.returncode != 0:
         raise RuntimeError(out.stderr.strip())
-    pods = []
-    for item in json.loads(out.stdout).get("items", []):
-        statuses = item.get("status", {}).get("containerStatuses", [])
-        restarts = sum(s.get("restartCount", 0) for s in statuses)
-        ready = sum(1 for s in statuses if s.get("ready"))
-        # find the current problem reason, if any
-        reason = None
-        for s in statuses:
-            state = s.get("state", {})
-            if "waiting" in state:
-                reason = state["waiting"].get("reason")
-            elif "terminated" in state:
-                reason = state["terminated"].get("reason")
-            if reason:
-                break
-        phase = item["status"].get("phase", "Unknown")
-        if reason is None and phase == "Pending":
-            reason = "Pending"
-        started = item["status"].get("startTime")
-        # uptime of the current run = newest container start (resets on restart)
-        run_starts = [
-            s["state"]["running"]["startedAt"]
-            for s in statuses if "running" in s.get("state", {})
-        ]
-        healthy = phase == "Running" and ready == len(statuses) and not reason
-        pods.append({
-            "name": item["metadata"]["name"],
-            "phase": phase,
-            "ready": f"{ready}/{len(statuses)}",
-            "restarts": restarts,
-            "started": started,
-            "age": humanize_age(started),
-            "uptime": humanize_age(max(run_starts)) if run_starts else "—",
-            "images": [s.get("image", "?") for s in statuses],
-            "reason": reason,
-            "simple_error": SIMPLE_ERRORS.get(
-                reason, f"Problem state: {reason}" if reason else None
-            ),
+    return [parse_pod(i) for i in json.loads(out.stdout).get("items", [])]
+
+
+def namespace_pods(namespace: str) -> list[dict]:
+    return kubectl_pods("-n", namespace)
+
+
+SYSTEM_NS_PREFIXES = ("kube-", "local-path-storage")
+
+
+def cluster_overview() -> list[dict]:
+    """Group all pods by namespace with rollup health for the card grid."""
+    groups: dict[str, list[dict]] = {}
+    for pod in kubectl_pods("-A"):
+        if pod["namespace"].startswith(SYSTEM_NS_PREFIXES):
+            continue
+        groups.setdefault(pod["namespace"], []).append(pod)
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
+        "%Y-%m-%d %H:%M:%S UTC"
+    )
+    with db() as conn:
+        incident_counts = dict(conn.execute(
+            "SELECT namespace, COUNT(*) FROM incidents"
+            " WHERE created_at > ? AND namespace IS NOT NULL GROUP BY namespace",
+            (cutoff,),
+        ).fetchall())
+
+    cards = []
+    for ns, pods in sorted(groups.items()):
+        healthy = sum(1 for p in pods if p["healthy"])
+        reasons = {p["reason"] for p in pods if p["reason"]}
+        if healthy == len(pods):
+            status, status_label = "ok", "Healthy"
+        elif reasons & {"CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "OOMKilled"}:
+            status, status_label = "crit", "Critical"
+        else:
+            status, status_label = "warn", "Degraded"
+        started = [p["started"] for p in pods if p["started"]]
+        run_uptimes = [p["uptime"] for p in pods if p["uptime"] != "—"]
+        cards.append({
+            "name": ns,
+            "status": status,
+            "status_label": status_label,
             "healthy": healthy,
+            "total": len(pods),
+            "restarts": sum(p["restarts"] for p in pods),
+            "incidents_24h": incident_counts.get(ns, 0),
+            "live_since": humanize_age(min(started)) if started else "—",
+            "images": len({img for p in pods for img in p["images"]}),
+            "problem": next(iter(reasons), None),
         })
-    return pods
+    return cards
 
 
 @app.get("/ns/{namespace}", response_class=HTMLResponse)

@@ -1,0 +1,197 @@
+- generic [active] [ref=f7e1]:
+  - banner [ref=f7e2]:
+    - generic [ref=f7e3]: ⛑ incidentpilot
+    - navigation [ref=f7e4]:
+      - link "Overview" [ref=f7e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=f7e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=f7e7] [cursor=pointer]:
+        - /url: /chat
+    - generic [ref=f7e8]: "cluster: incidentpilot-dev"
+  - main [ref=f7e9]:
+    - generic [ref=f7e11]:
+      - heading "Cluster overview" [level=1] [ref=f7e12]
+      - paragraph [ref=f7e13]: Live health of every namespace — click a card to drill in.
+    - generic [ref=f7e14]:
+      - link "default Healthy 9/9 pods healthy 43 restarts 4 incidents 24h 11 images live 2h 37m" [ref=f7e15] [cursor=pointer]:
+        - /url: /ns/default
+        - generic [ref=f7e16]:
+          - generic [ref=f7e18]: default
+          - generic [ref=f7e19]: Healthy
+        - generic [ref=f7e20]:
+          - generic [ref=f7e21]: 9/9
+          - generic [ref=f7e22]: pods healthy
+        - generic [ref=f7e23]:
+          - generic [ref=f7e24]:
+            - generic [ref=f7e25]: "43"
+            - generic [ref=f7e26]: restarts
+          - generic [ref=f7e27]:
+            - generic [ref=f7e28]: "4"
+            - generic [ref=f7e29]: incidents 24h
+          - generic [ref=f7e30]:
+            - generic [ref=f7e31]: "11"
+            - generic [ref=f7e32]: images
+        - generic [ref=f7e33]: live 2h 37m
+      - link "incidentpilot-demo Critical 0/1 pods healthy 735 restarts 3 incidents 24h 1 images live 7d CrashLoopBackOff" [ref=f7e35] [cursor=pointer]:
+        - /url: /ns/incidentpilot-demo
+        - generic [ref=f7e36]:
+          - generic [ref=f7e38]: incidentpilot-demo
+          - generic [ref=f7e39]: Critical
+        - generic [ref=f7e40]:
+          - generic [ref=f7e41]: 0/1
+          - generic [ref=f7e42]: pods healthy
+        - generic [ref=f7e43]:
+          - generic [ref=f7e44]:
+            - generic [ref=f7e45]: "735"
+            - generic [ref=f7e46]: restarts
+          - generic [ref=f7e47]:
+            - generic [ref=f7e48]: "3"
+            - generic [ref=f7e49]: incidents 24h
+          - generic [ref=f7e50]:
+            - generic [ref=f7e51]: "1"
+            - generic [ref=f7e52]: images
+        - generic [ref=f7e53]:
+          - generic [ref=f7e54]: live 7d
+          - generic [ref=f7e55]: CrashLoopBackOff
+      - link "job-finder Critical 0/1 pods healthy 4174 restarts 4 incidents 24h 1 images live 46d CrashLoopBackOff" [ref=f7e56] [cursor=pointer]:
+        - /url: /ns/job-finder
+        - generic [ref=f7e57]:
+          - generic [ref=f7e59]: job-finder
+          - generic [ref=f7e60]: Critical
+        - generic [ref=f7e61]:
+          - generic [ref=f7e62]: 0/1
+          - generic [ref=f7e63]: pods healthy
+        - generic [ref=f7e64]:
+          - generic [ref=f7e65]:
+            - generic [ref=f7e66]: "4174"
+            - generic [ref=f7e67]: restarts
+          - generic [ref=f7e68]:
+            - generic [ref=f7e69]: "4"
+            - generic [ref=f7e70]: incidents 24h
+          - generic [ref=f7e71]:
+            - generic [ref=f7e72]: "1"
+            - generic [ref=f7e73]: images
+        - generic [ref=f7e74]:
+          - generic [ref=f7e75]: live 46d
+          - generic [ref=f7e76]: CrashLoopBackOff
+      - link "jobfinder Degraded 0/2 pods healthy 0 restarts 7 incidents 24h 2 images live 46d PodInitializing" [ref=f7e77] [cursor=pointer]:
+        - /url: /ns/jobfinder
+        - generic [ref=f7e78]:
+          - generic [ref=f7e80]: jobfinder
+          - generic [ref=f7e81]: Degraded
+        - generic [ref=f7e82]:
+          - generic [ref=f7e83]: 0/2
+          - generic [ref=f7e84]: pods healthy
+        - generic [ref=f7e85]:
+          - generic [ref=f7e86]:
+            - generic [ref=f7e87]: "0"
+            - generic [ref=f7e88]: restarts
+          - generic [ref=f7e89]:
+            - generic [ref=f7e90]: "7"
+            - generic [ref=f7e91]: incidents 24h
+          - generic [ref=f7e92]:
+            - generic [ref=f7e93]: "2"
+            - generic [ref=f7e94]: images
+        - generic [ref=f7e95]:
+          - generic [ref=f7e96]: live 46d
+          - generic [ref=f7e97]: PodInitializing
+      - link "loki Healthy 2/2 pods healthy 6 restarts 0 incidents 24h 2 images live 99m" [ref=f7e98] [cursor=pointer]:
+        - /url: /ns/loki
+        - generic [ref=f7e99]:
+          - generic [ref=f7e101]: loki
+          - generic [ref=f7e102]: Healthy
+        - generic [ref=f7e103]:
+          - generic [ref=f7e104]: 2/2
+          - generic [ref=f7e105]: pods healthy
+        - generic [ref=f7e106]:
+          - generic [ref=f7e107]:
+            - generic [ref=f7e108]: "6"
+            - generic [ref=f7e109]: restarts
+          - generic [ref=f7e110]:
+            - generic [ref=f7e111]: "0"
+            - generic [ref=f7e112]: incidents 24h
+          - generic [ref=f7e113]:
+            - generic [ref=f7e114]: "2"
+            - generic [ref=f7e115]: images
+        - generic [ref=f7e116]: live 99m
+      - link "robusta-test Critical 0/1 pods healthy 0 restarts 3 incidents 24h 1 images live 111m ImagePullBackOff" [ref=f7e118] [cursor=pointer]:
+        - /url: /ns/robusta-test
+        - generic [ref=f7e119]:
+          - generic [ref=f7e121]: robusta-test
+          - generic [ref=f7e122]: Critical
+        - generic [ref=f7e123]:
+          - generic [ref=f7e124]: 0/1
+          - generic [ref=f7e125]: pods healthy
+        - generic [ref=f7e126]:
+          - generic [ref=f7e127]:
+            - generic [ref=f7e128]: "0"
+            - generic [ref=f7e129]: restarts
+          - generic [ref=f7e130]:
+            - generic [ref=f7e131]: "3"
+            - generic [ref=f7e132]: incidents 24h
+          - generic [ref=f7e133]:
+            - generic [ref=f7e134]: "1"
+            - generic [ref=f7e135]: images
+        - generic [ref=f7e136]:
+          - generic [ref=f7e137]: live 111m
+          - generic [ref=f7e138]: ImagePullBackOff
+      - link "testingtradingapp Healthy 3/3 pods healthy 164 restarts 0 incidents 24h 3 images live 46d" [ref=f7e139] [cursor=pointer]:
+        - /url: /ns/testingtradingapp
+        - generic [ref=f7e140]:
+          - generic [ref=f7e142]: testingtradingapp
+          - generic [ref=f7e143]: Healthy
+        - generic [ref=f7e144]:
+          - generic [ref=f7e145]: 3/3
+          - generic [ref=f7e146]: pods healthy
+        - generic [ref=f7e147]:
+          - generic [ref=f7e148]:
+            - generic [ref=f7e149]: "164"
+            - generic [ref=f7e150]: restarts
+          - generic [ref=f7e151]:
+            - generic [ref=f7e152]: "0"
+            - generic [ref=f7e153]: incidents 24h
+          - generic [ref=f7e154]:
+            - generic [ref=f7e155]: "3"
+            - generic [ref=f7e156]: images
+        - generic [ref=f7e157]: live 46d
+      - link "trading Critical 2/3 pods healthy 3880 restarts 2 incidents 24h 3 images live 47d CrashLoopBackOff" [ref=f7e159] [cursor=pointer]:
+        - /url: /ns/trading
+        - generic [ref=f7e160]:
+          - generic [ref=f7e162]: trading
+          - generic [ref=f7e163]: Critical
+        - generic [ref=f7e164]:
+          - generic [ref=f7e165]: 2/3
+          - generic [ref=f7e166]: pods healthy
+        - generic [ref=f7e167]:
+          - generic [ref=f7e168]:
+            - generic [ref=f7e169]: "3880"
+            - generic [ref=f7e170]: restarts
+          - generic [ref=f7e171]:
+            - generic [ref=f7e172]: "2"
+            - generic [ref=f7e173]: incidents 24h
+          - generic [ref=f7e174]:
+            - generic [ref=f7e175]: "3"
+            - generic [ref=f7e176]: images
+        - generic [ref=f7e177]:
+          - generic [ref=f7e178]: live 47d
+          - generic [ref=f7e179]: CrashLoopBackOff
+      - link "urltest Healthy 2/2 pods healthy 204 restarts 0 incidents 24h 1 images live 50d" [ref=f7e180] [cursor=pointer]:
+        - /url: /ns/urltest
+        - generic [ref=f7e181]:
+          - generic [ref=f7e183]: urltest
+          - generic [ref=f7e184]: Healthy
+        - generic [ref=f7e185]:
+          - generic [ref=f7e186]: 2/2
+          - generic [ref=f7e187]: pods healthy
+        - generic [ref=f7e188]:
+          - generic [ref=f7e189]:
+            - generic [ref=f7e190]: "204"
+            - generic [ref=f7e191]: restarts
+          - generic [ref=f7e192]:
+            - generic [ref=f7e193]: "0"
+            - generic [ref=f7e194]: incidents 24h
+          - generic [ref=f7e195]:
+            - generic [ref=f7e196]: "1"
+            - generic [ref=f7e197]: images
+        - generic [ref=f7e198]: live 50d

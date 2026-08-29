@@ -11,7 +11,8 @@
   <header>
     <span class="logo">⛑ incident<span class="accent">pilot</span></span>
     <nav>
-      <a href="/" {% if page == 'incidents' %}class="active"{% endif %}>Incidents</a>
+      <a href="/" {% if page == 'home' %}class="active"{% endif %}>Overview</a>
+      <a href="/incidents" {% if page == 'incidents' %}class="active"{% endif %}>Incidents</a>
       <a href="/chat" {% if page == 'chat' %}class="active"{% endif %}>Ask Holmes</a>
     </nav>
     <span class="cluster">cluster: {{ cluster_name }}</span>

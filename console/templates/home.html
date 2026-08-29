@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Overview · Incident Console{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Cluster overview</h1>
+    <p class="muted">Live health of every namespace — click a card to drill in.</p>
+  </div>
+</div>
+<div id="ns-grid" class="ns-grid" hx-get="/partials/namespaces" hx-trigger="every 10s" hx-swap="innerHTML">
+  {% include "_ns_cards.html" %}
+</div>
+{% endblock %}
