@@ -1,0 +1,12 @@
+{% for i in incidents %}
+<tr class="sev-{{ i.severity|lower }}" onclick="window.location='/incidents/{{ i.id }}'">
+  <td><span class="badge {{ i.severity|lower }}">{{ i.severity }}</span></td>
+  <td>{{ i.title }}</td>
+  <td>{{ i.namespace or '—' }}</td>
+  <td>{{ i.resource or '—' }}</td>
+  <td>{{ i.status }}</td>
+  <td class="muted">{{ i.created_at }}</td>
+</tr>
+{% else %}
+<tr><td colspan="6" class="muted empty">No incidents yet — waiting for alerts from Robusta…</td></tr>
+{% endfor %}

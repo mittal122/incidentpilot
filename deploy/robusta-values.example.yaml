@@ -1,0 +1,18 @@
+# Example additions to your Robusta Helm values for IncidentPilot.
+# Merge into your real values (which hold secrets) — do NOT commit secrets here.
+sinksConfig:
+  # ... keep your existing slack_sink etc ...
+  - webhook_sink:
+      name: console_sink
+      url: http://172.19.0.1:8010/api/ingest  # console reachable from pods; kind = docker net gateway
+      format: json
+      size_limit: 65536
+
+holmes:
+  # single-node clusters: default 2Gi request blocks rollouts
+  resources:
+    requests:
+      cpu: 100m
+      memory: 768Mi
+    limits:
+      memory: 2Gi

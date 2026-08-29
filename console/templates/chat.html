@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Ask Holmes · Incident Console{% endblock %}
+{% block content %}
+<h1>Ask Holmes</h1>
+<p class="muted">Free-form questions about the cluster. Holmes has access to kubectl, Prometheus and Loki toolsets.</p>
+<div id="chat-log"></div>
+<form hx-post="/api/chat" hx-target="#chat-log" hx-swap="beforeend" hx-indicator="#chat-spinner"
+      hx-on::after-request="if(event.detail.successful) this.reset()">
+  <input type="text" name="ask" placeholder="e.g. why is my pod crashing in namespace robusta-test?" required autofocus>
+  <button type="submit">Ask</button>
+  <span id="chat-spinner" class="htmx-indicator">investigating…</span>
+</form>
+{% endblock %}

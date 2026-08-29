@@ -1,0 +1,498 @@
+import base64
+import json
+import logging
+import re
+from typing import NoReturn
+import requests
+from prometrix import PrometheusQueryResult
+
+from robusta.core.model.base_params import (
+    AIInvestigateParams,
+    ChartValuesFormat,
+    HolmesChatParams,
+    HolmesConversationParams,
+    HolmesIssueChatParams,
+    HolmesOAuthParams,
+    ResourceInfo,
+)
+from robusta.core.model.events import ExecutionBaseEvent
+from robusta.core.playbooks.actions_registry import action
+from robusta.core.playbooks.prometheus_enrichment_utils import (
+    build_chart_from_prometheus_result,
+)
+from robusta.core.reporting import Finding, FindingSubject
+from robusta.core.reporting.base import EnrichmentType
+from robusta.core.reporting.consts import FindingSubjectType, FindingType
+from robusta.core.reporting.holmes import (
+    FileBlock,
+    HolmesChatRequest,
+    HolmesChatResult,
+    HolmesChatResultsBlock,
+    HolmesConversationRequest,
+    HolmesConversationResult,
+    HolmesIssueChatRequest,
+    HolmesRequest,
+    HolmesResult,
+    HolmesResultsBlock,
+)
+from robusta.core.reporting.utils import convert_svg_to_png
+from robusta.core.stream.utils import (
+    create_sse_message,
+    parse_sse_event_type,
+    parse_sse_data,
+    StreamEvents,
+)
+from robusta.integrations.prometheus.utils import HolmesDiscovery
+from robusta.utils.error_codes import ActionException, ErrorCodes
+
+GRAPH_TOOLS = ["execute_prometheus_range_query", "query_datadog_metrics"]
+
+
+def build_investigation_title(params: AIInvestigateParams) -> str:
+    if params.investigation_type == "analyze_problems":
+        return params.ask
+
+    return params.context.get("issue_type", "unknown health issue")
+
+
+def handle_holmes_error(e: Exception) -> NoReturn:
+    if isinstance(e, requests.ConnectionError):
+        raise ActionException(
+            ErrorCodes.HOLMES_CONNECTION_ERROR,
+            "Holmes endpoint is currently unreachable.",
+        )
+    elif isinstance(e, requests.HTTPError):
+        # Log the upstream response body so 4xx/5xx diagnostics aren't lost in
+        # the generic "Holmes internal configuration error" branch below
+        # (e.g. {"detail":"missing user_id"} would otherwise be invisible).
+        if e.response is not None:
+            logging.error(
+                f"Holmes responded {e.response.status_code} on {e.request.method if e.request else '?'} "
+                f"{e.request.url if e.request else '?'}: {e.response.text}"
+            )
+        if e.response.status_code == 401 and "invalid_api_key" in e.response.text:
+            raise ActionException(
+                ErrorCodes.HOLMES_REQUEST_ERROR, "Holmes invalid api key."
+            )
+        elif e.response.status_code == 429:
+            raise ActionException(
+                ErrorCodes.HOLMES_RATE_LIMIT_EXCEEDED, "Holmes rate limit exceeded."
+            )
+        raise ActionException(
+            ErrorCodes.HOLMES_REQUEST_ERROR, "Holmes internal configuration error."
+        )
+    else:
+        raise ActionException(
+            ErrorCodes.HOLMES_UNEXPECTED_ERROR, "An unexpected error occurred."
+        )
+
+
+@action
+def ask_holmes(event: ExecutionBaseEvent, params: AIInvestigateParams):
+    holmes_url = HolmesDiscovery.find_holmes_url(params.holmes_url)
+    if not holmes_url:
+        raise ActionException(
+            ErrorCodes.HOLMES_DISCOVERY_FAILED,
+            "Robusta couldn't connect to the Holmes client.",
+        )
+
+    investigation__title = build_investigation_title(params)
+    subject = params.resource.dict() if params.resource else {}
+
+    try:
+        params.ask = add_labels_to_ask(params)
+        holmes_req = HolmesRequest(
+            source=params.context.get("source", "unknown source")
+            if params.context
+            else "unknown source",
+            title=investigation__title,
+            subject=subject,
+            context=params.context if params.context else {},
+            include_tool_calls=True,
+            include_tool_call_results=True,
+            sections=params.sections,
+            model=params.model,
+        )
+
+        if params.stream:
+            with requests.post(
+                f"{holmes_url}/api/stream/investigate",
+                data=holmes_req.json(),
+                stream=True,
+                headers={"Connection": "keep-alive"},
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_content(
+                    chunk_size=None, decode_unicode=True
+                ):  # Avoid streaming chunks from holmes. send them as they arrive.
+                    if line:
+                        event.ws(data=line)
+            return
+
+        else:
+            result = requests.post(
+                f"{holmes_url}/api/investigate", data=holmes_req.json()
+            )
+            result.raise_for_status()
+
+            holmes_result = HolmesResult(**json.loads(result.text))
+            title_suffix = (
+                f" on {params.resource.name}"
+                if params.resource
+                and params.resource.name
+                and params.resource.name.lower() != "unresolved"
+                else ""
+            )
+
+            kind = params.resource.kind if params.resource else None
+            finding = Finding(
+                title=f"AI Analysis of {investigation__title}{title_suffix}",
+                aggregation_key="HolmesInvestigationResult",
+                subject=FindingSubject(
+                    name=params.resource.name if params.resource else "",
+                    namespace=params.resource.namespace if params.resource else "",
+                    subject_type=FindingSubjectType.from_kind(kind)
+                    if kind
+                    else FindingSubjectType.TYPE_NONE,
+                    node=params.resource.node if params.resource else "",
+                    container=params.resource.container if params.resource else "",
+                ),
+                finding_type=FindingType.AI_ANALYSIS,
+                failure=False,
+            )
+            finding.add_enrichment(
+                [HolmesResultsBlock(holmes_result=holmes_result)],
+                enrichment_type=EnrichmentType.ai_analysis,
+            )
+
+            event.add_finding(finding)
+
+    except Exception as e:
+        logging.exception(
+            f"Failed to get holmes analysis for {investigation__title} {params.context} {subject}",
+            exc_info=True,
+        )
+        handle_holmes_error(e)
+
+
+def build_conversation_title(params: HolmesConversationParams) -> str:
+    return (
+        f"{params.resource}, {params.ask} for issue '{params.context.robusta_issue_id}'"
+    )
+
+
+def add_labels_to_ask(params: HolmesConversationParams) -> str:
+    label_string = (
+        f"the alert has the following labels: {params.context.get('labels')}"
+        if params.context.get("labels")
+        else ""
+    )
+    ask = f"{params.ask}, {label_string}" if label_string else params.ask
+    logging.debug(f"holmes ask query: {ask}")
+    return ask
+
+
+# old version of holmes conversation API
+@action
+def holmes_conversation(event: ExecutionBaseEvent, params: HolmesConversationParams):
+    holmes_url = HolmesDiscovery.find_holmes_url(params.holmes_url)
+    if not holmes_url:
+        raise ActionException(
+            ErrorCodes.HOLMES_DISCOVERY_FAILED,
+            "Robusta couldn't connect to the Holmes client.",
+        )
+
+    conversation_title = build_conversation_title(params)
+
+    try:
+        holmes_req = HolmesConversationRequest(
+            user_prompt=params.ask,
+            source=getattr(params.context, "source", "unknown source")
+            if params.context
+            else "unknown source",
+            resource=params.resource,
+            conversation_type=params.conversation_type,
+            context=params.context,
+            include_tool_calls=True,
+            include_tool_call_results=True,
+        )
+        result = requests.post(f"{holmes_url}/api/conversation", data=holmes_req.json())
+        result.raise_for_status()
+        holmes_result = HolmesConversationResult(**json.loads(result.text))
+
+        params_resource_kind = params.resource.kind or ""
+        finding = Finding(
+            title=f"AI Analysis of {conversation_title}",
+            aggregation_key="HolmesConversationResult",
+            subject=FindingSubject(
+                name=params.resource.name if params.resource else "",
+                namespace=params.resource.namespace if params.resource else "",
+                subject_type=(
+                    FindingSubjectType.from_kind(params_resource_kind)
+                    if params.resource
+                    else FindingSubjectType.TYPE_NONE
+                ),
+                node=params.resource.node if params.resource else "",
+                container=params.resource.container if params.resource else "",
+            ),
+            finding_type=FindingType.AI_ANALYSIS,
+            failure=False,
+        )
+        finding.add_enrichment(
+            [HolmesResultsBlock(holmes_result=holmes_result)],
+            enrichment_type=EnrichmentType.ai_analysis,
+        )
+
+        event.add_finding(finding)
+
+    except Exception as e:
+        logging.exception(
+            f"Failed to get holmes chat for {conversation_title}", exc_info=True
+        )
+        handle_holmes_error(e)
+
+
+@action
+def holmes_issue_chat(event: ExecutionBaseEvent, params: HolmesIssueChatParams):
+    holmes_url = HolmesDiscovery.find_holmes_url(params.holmes_url)
+    if not holmes_url:
+        raise ActionException(
+            ErrorCodes.HOLMES_DISCOVERY_FAILED,
+            "Robusta couldn't connect to the Holmes client.",
+        )
+
+    conversation_title = build_conversation_title(params)
+    params_resource_kind = params.resource.kind or ""
+    try:
+        params_dict = params.dict(exclude={"holmes_url", "render_graph_images", "resource", "context"})
+        holmes_req = HolmesIssueChatRequest(
+            **params_dict,
+            investigation_result=params.context.investigation_result,
+            issue_type=params.context.issue_type,
+        )
+        result = requests.post(f"{holmes_url}/api/issue_chat", data=holmes_req.json())
+        result.raise_for_status()
+
+        holmes_result = HolmesChatResult(**json.loads(result.text))
+
+        finding = Finding(
+            title=f"AI Analysis of {conversation_title}",
+            aggregation_key="HolmesConversationResult",
+            subject=FindingSubject(
+                name=params.resource.name if params.resource else "",
+                namespace=params.resource.namespace if params.resource else "",
+                subject_type=(
+                    FindingSubjectType.from_kind(params_resource_kind)
+                    if params.resource
+                    else FindingSubjectType.TYPE_NONE
+                ),
+                node=params.resource.node if params.resource else "",
+                container=params.resource.container if params.resource else "",
+            ),
+            finding_type=FindingType.AI_ANALYSIS,
+            failure=False,
+        )
+        finding.add_enrichment(
+            [HolmesChatResultsBlock(holmes_result=holmes_result)],
+            enrichment_type=EnrichmentType.ai_analysis,
+        )
+
+        event.add_finding(finding)
+
+    except Exception as e:
+        logging.exception(
+            f"Failed to get holmes chat for {conversation_title}", exc_info=True
+        )
+        handle_holmes_error(e)
+
+
+@action
+def holmes_chat(event: ExecutionBaseEvent, params: HolmesChatParams):
+    holmes_url = HolmesDiscovery.find_holmes_url(params.holmes_url)
+    if not holmes_url:
+        raise ActionException(
+            ErrorCodes.HOLMES_DISCOVERY_FAILED,
+            "Robusta couldn't connect to the Holmes client.",
+        )
+
+    cluster_name = event.get_context().cluster_name
+
+    try:
+        # Pass through all parameters to Holmes, excluding fields used only by this action
+        # This allows Holmes clients/servers to add new parameters without requiring updates here
+        params_dict = params.dict(exclude={"holmes_url", "render_graph_images"})
+        holmes_req = HolmesChatRequest(**params_dict)
+        url = f"{holmes_url}/api/chat"
+        if params.stream:
+            if params.render_graph_images:
+                stream_and_render_graphs(url, holmes_req, event)
+                return
+            else:
+                with requests.post(
+                    url,
+                    data=holmes_req.json(),
+                    stream=True,
+                    headers={"Connection": "keep-alive"},
+                ) as resp:
+                    resp.raise_for_status()
+                    for line in resp.iter_content(
+                        chunk_size=None, decode_unicode=True
+                    ):  # Avoid streaming chunks from holmes. send them as they arrive.
+                        if line:
+                            event.ws(data=line)
+                return
+
+        result = requests.post(url, data=holmes_req.json())
+        result.raise_for_status()
+        holmes_result = HolmesChatResult(**json.loads(result.text))
+        holmes_result.files = []
+        if params.render_graph_images:
+            try:
+                for tool in holmes_result.tool_calls:
+                    if tool.tool_name not in GRAPH_TOOLS:
+                        continue
+
+                    # removes all embedded tool calls in this case as its not supported. 
+                    holmes_result.analysis = re.sub(
+                        r"<<.*?>>", "", holmes_result.analysis
+                    ).strip()
+                    json_content = json.loads(tool.result["data"])
+                    contents, name = get_png_from_graph_tool(json_content)
+                    holmes_result.files.append(FileBlock(f"{name}.png", contents))
+
+                holmes_result.tool_calls = [
+                    tool
+                    for tool in holmes_result.tool_calls
+                    if tool.tool_name not in GRAPH_TOOLS
+                ]
+
+            except Exception:
+                logging.exception("Failed to convert tools to images")
+
+        finding = Finding(
+            title="AI Ask Chat",
+            aggregation_key="HolmesChatResult",
+            subject=FindingSubject(
+                subject_type=FindingSubjectType.TYPE_NONE,
+            ),
+            finding_type=FindingType.AI_ANALYSIS,
+            failure=False,
+        )
+
+        finding.add_enrichment(
+            [HolmesChatResultsBlock(holmes_result=holmes_result)],
+            enrichment_type=EnrichmentType.ai_analysis,
+        )
+
+        event.add_finding(finding)
+
+    except Exception as e:
+        logging.exception(
+            f"Failed to get holmes chat for {cluster_name} cluster", exc_info=True
+        )
+        handle_holmes_error(e)
+
+
+@action
+def holmes_oauth(event: ExecutionBaseEvent, params: HolmesOAuthParams):
+    """
+    Forwards OAuth callback data to Holmes for token exchange and storage.
+
+    This action is a thin pass-through — the actual OAuth contract is defined
+    in Holmes. Params use extra=allow so Holmes can evolve the contract
+    (e.g. add new fields) without requiring runner changes.
+    """
+    holmes_url = HolmesDiscovery.find_holmes_url(params.holmes_url)
+    if not holmes_url:
+        raise ActionException(
+            ErrorCodes.HOLMES_DISCOVERY_FAILED,
+            "Robusta couldn't connect to the Holmes client.",
+        )
+
+    try:
+        result = requests.post(
+            f"{holmes_url}/api/oauth/callback",
+            json=params.dict(),
+            timeout=60,
+        )
+        result.raise_for_status()
+        response_data = result.json()
+
+        finding = Finding(
+            title="Holmes OAuth",
+            aggregation_key="HolmesOAuthResult",
+            subject=FindingSubject(subject_type=FindingSubjectType.TYPE_NONE),
+            finding_type=FindingType.AI_ANALYSIS,
+            failure=not response_data.get("success", False),
+        )
+        event.add_finding(finding)
+
+    except Exception as e:
+        logging.exception("Failed to complete Holmes OAuth callback")
+        handle_holmes_error(e)
+
+
+def stream_and_render_graphs(url, holmes_req, event):
+    with requests.post(
+        url,
+        data=holmes_req.json(),
+        stream=True,
+        headers={"Connection": "keep-alive"},
+    ) as resp:
+        resp.raise_for_status()
+        for stream_event in resp.iter_content(
+            chunk_size=None, decode_unicode=True
+        ):  # Avoid streaming chunks from holmes. send them as they arrive.
+            if stream_event:
+                event_lines = stream_event.splitlines()
+                # extra saftey check before proccessing event.
+                if len(event_lines) < 2:
+                    event.ws(data=stream_event)
+                    continue
+
+                event_type = parse_sse_event_type(event_lines[0])
+                # removes all embedded tool calls in this case as its not supported. 
+                if event_type == StreamEvents.ANSWER_END.value:
+                    stream_event = re.sub(r"<<.*?>>", "", stream_event)
+
+                if event_type != StreamEvents.TOOL_RESULT.value:
+                    event.ws(data=stream_event)
+                    continue
+
+                tool_res = parse_sse_data(event_lines[1])
+                if not tool_res or tool_res.get("name", "") not in GRAPH_TOOLS:
+                    event.ws(data=stream_event)
+                    continue
+
+                try:  # convert graph tool to png.
+                    tool_data = json.loads(tool_res["result"]["data"])
+                    content, _ = get_png_from_graph_tool(tool_data)
+                    tool_res["result"]["data"] = base64.b64encode(content).decode(
+                        "utf-8"
+                    )
+                    tool_res["result_type"] = "png"
+                    event.ws(data=create_sse_message(event_type, tool_res))
+                except Exception:
+                    logging.exception(
+                        "Failed to convert graph tool to png %s,", event_lines[1]
+                    )
+                    event.ws(data=stream_event)
+
+
+def get_png_from_graph_tool(tool_result_data: dict):
+    query_result = PrometheusQueryResult(data=tool_result_data.get("data", {}))
+    try:
+        output_type_str = tool_result_data.get("output_type", "Plain")
+        output_type = ChartValuesFormat[output_type_str]
+    except KeyError:
+        output_type = ChartValuesFormat.Plain  # fallback in case of an invalid string
+
+    chart = build_chart_from_prometheus_result(
+        query_result,
+        tool_result_data.get("description", "graph"),
+        values_format=output_type,
+    )
+
+    contents = convert_svg_to_png(chart.render())
+    name = tool_result_data.get("description", "graph").replace(" ", "_")
+    return contents, name

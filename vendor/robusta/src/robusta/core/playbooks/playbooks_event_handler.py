@@ -1,0 +1,83 @@
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Optional
+
+from robusta.core.model.events import ExecutionBaseEvent
+from robusta.core.playbooks.base_trigger import TriggerEvent
+from robusta.model.alert_relabel_config import AlertRelabel
+from robusta.model.playbook_action import PlaybookAction
+from robusta.runner.telemetry import Telemetry
+
+
+class PlaybooksEventHandler(ABC):
+    """Interface for handling trigger events and running playbook actions"""
+
+    @abstractmethod
+    def handle_trigger(self, trigger_event: TriggerEvent) -> Optional[Dict[str, Any]]:
+        """Handle trigger event. Find the matching playbooks and run their actions"""
+        pass
+
+    @abstractmethod
+    def run_actions(
+        self,
+        execution_event: ExecutionBaseEvent,
+        actions: List[PlaybookAction],
+        sync_response: bool = False,
+        no_sinks: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Run list of actions using the provided execution event"""
+        pass
+
+    @abstractmethod
+    def run_external_action(
+        self,
+        action_name: str,
+        action_params: Optional[dict],
+        sinks: Optional[List[str]],
+        sync_response: bool = False,
+        no_sinks: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Execute an external action"""
+        pass
+
+    @abstractmethod
+    def run_external_stream_action(
+        self, action_name: str, action_params: Optional[dict], stream: Callable[str, Optional[str]]
+    ) -> Optional[Dict[str, Any]]:
+        """Execute an external stream action"""
+        pass
+
+    @abstractmethod
+    def get_global_config(self) -> dict:
+        """Return runner global config"""
+        pass
+
+    @abstractmethod
+    def get_relabel_config(self) -> List[AlertRelabel]:
+        """Return runner alert relabel config"""
+        pass
+
+    @abstractmethod
+    def get_light_actions(
+        self,
+    ) -> List[str]:
+        """Returns configured light actions"""
+        pass
+
+    @abstractmethod
+    def get_telemetry(
+        self,
+    ) -> Telemetry:
+        """Return runner telemetry"""
+        pass
+
+    @abstractmethod
+    def is_healthy(
+        self,
+    ) -> bool:
+        """Return if the runner is healthy"""
+        pass
+
+    @abstractmethod
+    def handle_sigint(self, sig, frame):
+        """Run pre-stop procedure"""
+        pass

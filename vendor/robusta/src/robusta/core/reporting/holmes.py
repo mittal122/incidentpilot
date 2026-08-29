@@ -1,0 +1,107 @@
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, Field
+
+from robusta.core.model.base_params import (
+    ConversationType,
+    HolmesInvestigationResult,
+    HolmesOldConversationIssueContext,
+    ResourceInfo,
+    ToolApprovalDecision,
+)
+from robusta.core.reporting import BaseBlock
+from robusta.core.reporting.blocks import FileBlock
+
+
+class HolmesRequest(BaseModel):
+    source: str  # "prometheus" etc
+    title: str
+    description: str = ""
+    subject: dict
+    context: Dict[str, Any]
+    include_tool_calls: bool = False
+    include_tool_call_results: bool = False
+    sections: Optional[Dict[str, str]] = None
+    model: Optional[str] = None
+
+
+class HolmesConversationRequest(BaseModel):
+    user_prompt: str
+    source: Optional[str] = None  # "prometheus" etc
+    conversation_type: ConversationType
+    resource: Optional[ResourceInfo] = ResourceInfo()
+    context: HolmesOldConversationIssueContext
+    include_tool_calls: bool = False
+    include_tool_call_results: bool = False
+
+
+class HolmesChatRequest(BaseModel):
+    """
+    Request model for Holmes chat API.
+
+    This class allows extra fields to be passed through to Holmes.
+    Any additional parameters received will be forwarded to the Holmes server,
+    allowing client/server upgrades without requiring changes to this middleware.
+    """
+
+    ask: str
+    conversation_history: Optional[List[dict]] = None
+    model: Optional[str] = None
+    stream: bool = Field(default=False)
+    enable_tool_approval: bool = Field(default=False)
+    tool_decisions: Optional[List[ToolApprovalDecision]] = None
+    additional_system_prompt: Optional[str] = None
+    request_type: Optional[str] = None
+    request_source: Optional[str] = None
+    user_email: Optional[str] = None
+    source_ref: Optional[str] = None
+    conversation_id: Optional[str] = None
+    conversation_source: Optional[str] = None
+    # URL of the surface the chat originated from (Slack thread permalink,
+    # Teams message link, platform chat/workflow-run URL). Holmes renders it
+    # into the system prompt so PRs/issues it creates link back to it.
+    conversation_link: Optional[str] = None
+    is_internal: Optional[bool] = None
+    meta: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
+
+
+class HolmesIssueChatRequest(HolmesChatRequest):
+    investigation_result: HolmesInvestigationResult
+    issue_type: str
+
+
+class ToolCallResult(BaseModel):
+    tool_name: str
+    description: str
+    result: Union[str, dict] # dict is for new structured output results and string to support old versions of holmes
+
+
+class HolmesResult(BaseModel):
+    tool_calls: Optional[List[ToolCallResult]] = None
+    analysis: Optional[str] = None
+    sections: Optional[Dict[str, Union[str, None]]] = None
+    instructions: List[str] = []
+
+
+class HolmesConversationResult(BaseModel):
+    tool_calls: Optional[List[ToolCallResult]] = None
+    analysis: Optional[str] = None
+
+
+class HolmesResultsBlock(BaseBlock):
+    holmes_result: Optional[HolmesResult]
+
+
+class HolmesChatResult(BaseModel):
+    analysis: Optional[str] = None
+    files: Optional[List[FileBlock]] = None
+    tool_calls: Optional[List[ToolCallResult]] = None
+    conversation_history: Optional[List[dict]] = None
+    metadata: Optional[dict] = None
+
+
+class HolmesChatResultsBlock(BaseBlock):
+    holmes_result: Optional[HolmesChatResult]

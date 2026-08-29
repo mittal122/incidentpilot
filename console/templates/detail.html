@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ i.title }} · Incident Console{% endblock %}
+{% block content %}
+<a href="/" class="back">← all incidents</a>
+<h1><span class="badge {{ i.severity|lower }}">{{ i.severity }}</span> {{ i.title }}</h1>
+<p class="muted">{{ i.namespace or '—' }} / {{ i.resource or '—' }} · {{ i.created_at }} · status: {{ i.status }}</p>
+
+<section>
+  <h2>Enrichment (from Robusta)</h2>
+  <pre class="enrichment">{{ i.description or '(no description in alert payload)' }}</pre>
+</section>
+
+<section>
+  <h2>Root cause (HolmesGPT)</h2>
+  <div id="investigation">
+    {% if i.investigation %}
+      <pre class="investigation">{{ i.investigation }}</pre>
+    {% else %}
+      <button hx-post="/incidents/{{ i.id }}/investigate" hx-target="#investigation"
+              hx-swap="innerHTML" hx-indicator="#inv-spinner">🔎 Investigate with Holmes</button>
+      <span id="inv-spinner" class="htmx-indicator">Holmes is investigating… (can take a minute)</span>
+    {% endif %}
+  </div>
+</section>
+
+<section>
+  <h2>Actions</h2>
+  {% if i.namespace and i.resource %}
+    <button class="danger" hx-post="/incidents/{{ i.id }}/restart" hx-target="#action-result"
+            hx-swap="innerHTML" hx-confirm="Restart (delete) pod {{ i.namespace }}/{{ i.resource }}? Its controller will recreate it.">
+      ♻ Approve: restart pod {{ i.resource }}
+    </button>
+  {% else %}
+    <span class="muted">No pod identified in this alert — no actions available.</span>
+  {% endif %}
+  <div id="action-result"></div>
+</section>
+
+<section>
+  <h2>Raw alert payload</h2>
+  <details><summary>show JSON</summary><pre>{{ i.raw_pretty }}</pre></details>
+</section>
+{% endblock %}

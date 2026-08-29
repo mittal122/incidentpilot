@@ -1,0 +1,20 @@
+apiVersion: v2
+name: robusta
+description: Robusta Helm chart for Kubernetes
+type: application
+
+# these are set to the right value by .github/workflows/release.yaml
+# we use 0.0.1 as a placeholder for the version` because Helm wont allow `0.0.0` and we want to be able to run
+# `helm install` on development checkouts without updating this file. the version doesn't matter in that case anyway
+version: 0.0.1
+appVersion: 0.0.0
+
+dependencies:
+  - name: kube-prometheus-stack
+    version: 72.0.1
+    condition: enablePrometheusStack
+    repository: "https://prometheus-community.github.io/helm-charts"
+  - name: holmes
+    version: 0.40.0
+    condition: enableHolmesGPT
+    repository: "https://robusta-charts.storage.googleapis.com"

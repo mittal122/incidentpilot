@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Incidents · Incident Console{% endblock %}
+{% block content %}
+<h1>Incidents</h1>
+<table class="incident-table">
+  <thead>
+    <tr><th>Severity</th><th>Title</th><th>Namespace</th><th>Resource</th><th>Status</th><th>When</th></tr>
+  </thead>
+  <tbody id="incident-rows" hx-get="/partials/incidents" hx-trigger="every 5s" hx-swap="innerHTML">
+    {% include "_incident_rows.html" %}
+  </tbody>
+</table>
+{% endblock %}

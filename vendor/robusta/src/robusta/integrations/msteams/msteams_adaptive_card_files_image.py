@@ -1,0 +1,70 @@
+import base64
+import os
+import tempfile
+import uuid
+from typing import List
+
+from robusta.core.reporting.blocks import FileBlock
+from robusta.core.reporting.utils import JPG_SUFFIX, PNG_SUFFIX, convert_svg_to_png, file_suffix_match, is_image
+from robusta.integrations.msteams.msteams_elements.msteams_images import MsTeamsImages
+
+
+class MsTeamsAdaptiveCardFilesImage:
+    @classmethod
+    def create_files_for_presentation(cls, file_blocks: List[FileBlock]) -> map:
+        encoded_images = []
+        image_file_blocks = [file_block for file_block in file_blocks if is_image(file_block.filename)]
+        for image_file_block in image_file_blocks:
+            encoded_images.append(
+                cls.__convert_bytes_to_base_64_url(image_file_block.filename, image_file_block.contents)
+            )
+
+        if len(encoded_images) == 0:
+            return []
+        return MsTeamsImages(encoded_images)
+
+    @classmethod
+    def __get_tmp_file_path(cls):
+        return os.path.join(tempfile.gettempdir(), str(uuid.uuid1()))
+
+    @classmethod
+    def __convert_bytes_to_base_64_url(cls, file_name: str, image_bytes: bytes):
+        if file_suffix_match(file_name, JPG_SUFFIX):
+            return cls.__jpg_convert_bytes_to_base_64_url(image_bytes)
+        if file_suffix_match(file_name, PNG_SUFFIX):
+            return cls.__png_convert_bytes_to_base_64_url(image_bytes)
+        return cls.__svg_convert_bytes_to_jpg(image_bytes)
+
+    @classmethod
+    def __jpg_convert_bytes_to_base_64_url(cls, jpg_bytes: bytes):
+        b64_string = base64.b64encode(jpg_bytes).decode("utf-8")
+        return "data:image/jpeg;base64,{0}".format(b64_string)
+
+    # msteams cant read parsing of url to 'data:image/png;base64,...
+    @classmethod
+    def __png_convert_bytes_to_base_64_url(cls, png_bytes: bytes):
+        from PIL import Image
+
+        png_file_path = cls.__get_tmp_file_path() + PNG_SUFFIX
+        jpg_file_path = cls.__get_tmp_file_path() + JPG_SUFFIX
+        with open(png_file_path, "wb") as f:
+            f.write(png_bytes)
+
+        im = Image.open(png_file_path)
+        rgb_im = im.convert("RGB")
+        rgb_im.save(jpg_file_path)
+        with open(jpg_file_path, "rb") as f:
+            jpg_bytes = f.read()
+
+        os.remove(png_file_path)
+        os.remove(jpg_file_path)
+
+        return cls.__jpg_convert_bytes_to_base_64_url(jpg_bytes)
+
+    # msteams cant read parsing of url to svg image
+    @classmethod
+    def __svg_convert_bytes_to_jpg(cls, svg_bytes: bytes):
+        png_bytes = convert_svg_to_png(svg_bytes)
+        if png_bytes is None:
+            raise ValueError("failed to convert svg to png for msteams image")
+        return cls.__png_convert_bytes_to_base_64_url(png_bytes)

@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "robusta.fullname" . }}-forwarder
+  namespace: {{ .Release.Namespace }}
+  labels:
+    robusta: forwarder
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "robusta.fullname" . }}-forwarder
+  replicas: 1
+  revisionHistoryLimit: {{ .Values.kubewatch.revisionHistoryLimit }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/kubewatch-configmap.yaml") . | sha256sum }}
+        {{- if .Values.kubewatch.annotations }} {{ toYaml .Values.kubewatch.annotations | nindent 8 }}
+        {{- end }}
+        {{- if .Values.globalConfig.custom_annotations }} {{ toYaml .Values.globalConfig.custom_annotations | nindent 8 }}
+        {{- end }}
+      labels:
+        app: {{ include "robusta.fullname" . }}-forwarder
+        {{- with .Values.kubewatch.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.kubewatch.customServiceAccount }}
+      serviceAccountName: {{ .Values.kubewatch.customServiceAccount }}
+      {{ else }}
+      serviceAccountName: {{ include "robusta.fullname" . }}-forwarder-service-account
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      {{- $pullSecrets := .Values.kubewatch.imagePullSecrets | default .Values.global.imagePullSecrets }}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+      {{- toYaml $pullSecrets | nindent 6 }}
+      {{- end }}
+      {{- with .Values.kubewatch.securityContext.pod }}
+      securityContext:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: kubewatch
+        # this is a custom version of kubewatch built from https://github.com/aantn/kubewatch
+        {{- if .Values.kubewatch.image }}
+        image: {{ .Values.kubewatch.image }}
+        {{ else }}
+        image: {{ .Values.image.registry }}/{{ .Values.kubewatch.imageName }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.kubewatch.imagePullPolicy }}
+        env:
+          - name: KW_CONFIG
+            value: /config
+          - name: ENABLE_PPROF
+            value: {{ .Values.kubewatch.pprof | quote }}
+          {{- if .Values.kubewatch.additional_env_vars }}
+          {{ toYaml .Values.kubewatch.additional_env_vars | nindent 10 }}
+          {{- end }}
+        volumeMounts:
+          - name: {{ include "robusta.fullname" . }}-kubewatch-config
+            mountPath: /config
+          {{- with .Values.kubewatch.extraVolumeMounts }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        {{- with .Values.kubewatch.securityContext.container }}
+        securityContext:
+        {{- toYaml . | nindent 12 }}
+        {{- end }}
+        resources:
+          requests:
+            cpu: {{ .Values.kubewatch.resources.requests.cpu }}
+            memory: {{ if .Values.isSmallCluster }}"64Mi"{{ else }}{{ .Values.kubewatch.resources.requests.memory | quote }}{{ end }}
+          limits:
+            memory: {{ if .Values.isSmallCluster }}"64Mi"{{ else if .Values.kubewatch.resources.limits.memory }}{{ .Values.kubewatch.resources.limits.memory | quote }}{{ else }}{{ .Values.kubewatch.resources.requests.memory | quote }}{{ end }}
+            {{ if .Values.kubewatch.resources.limits.cpu }}cpu: {{ .Values.kubewatch.resources.limits.cpu | quote }}{{ end }}
+      volumes:
+        - name:  {{ include "robusta.fullname" . }}-kubewatch-config
+          configMap:
+            name: {{ include "robusta.fullname" . }}-kubewatch-config
+        {{- with .Values.kubewatch.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if .Values.kubewatch.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.kubewatch.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.kubewatch.affinity }}
+      affinity: {{ toYaml .Values.kubewatch.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.kubewatch.tolerations }}
+      tolerations:  {{ toYaml .Values.kubewatch.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.kubewatch.priorityClassName }}
+      priorityClassName: {{ .Values.kubewatch.priorityClassName }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "robusta.fullname" . }}-forwarder
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "robusta.fullname" . }}-forwarder
+spec:
+  selector:
+    app: {{ include "robusta.fullname" . }}-forwarder
+  ports:
+    - name: forwarder-metrics
+      protocol: TCP
+      port: 80
+      targetPort: 2112
+{{ if and (.Values.enableServiceMonitors) (or (.Values.enablePrometheusStack) (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") ) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "robusta.fullname" . }}-forwarder-service-monitor
+  labels:
+    release: {{ include "robusta.fullname" . }}
+    {{- with .Values.kubewatch.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - path: {{ .Values.kubewatch.serviceMonitor.path }}
+      port: forwarder-metrics
+      {{- if .Values.kubewatch.serviceMonitor.interval }}
+      interval: {{ .Values.kubewatch.serviceMonitor.interval }}
+      {{- end }}
+      {{- if .Values.kubewatch.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.kubewatch.serviceMonitor.scrapeTimeout }}
+      {{- end }}
+      {{- if .Values.kubewatch.serviceMonitor.relabelings }}
+      relabelings: {{- tpl (toYaml .Values.kubewatch.serviceMonitor.relabelings) . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.kubewatch.serviceMonitor.metricRelabelings }}
+      metricRelabelings: {{- tpl (toYaml .Values.kubewatch.serviceMonitor.metricRelabelings) . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.kubewatch.serviceMonitor.honorLabels }}
+      honorLabels: {{ .Values.kubewatch.serviceMonitor.honorLabels }}
+      {{- end }}
+  selector:
+    matchLabels:
+      app: {{ include "robusta.fullname" . }}-forwarder
+  targetLabels:
+    - target
+{{ end }}

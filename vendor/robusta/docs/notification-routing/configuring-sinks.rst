@@ -1,0 +1,151 @@
+.. _sinks-overview:
+
+
+
+Defining Sinks
+==========================
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+
+   All Sinks <../configuration/sinks/index>
+   ../configuration/sinks/slack
+   ../configuration/sinks/ms-teams
+   ../configuration/sinks/RobustaUI
+   ../configuration/sinks/telegram
+   ../configuration/sinks/discord
+   ../configuration/sinks/DataDog
+   ../configuration/sinks/mattermost
+   ../configuration/sinks/Opsgenie
+   ../configuration/sinks/PagerDuty
+   ../configuration/sinks/VictorOps
+   ../configuration/sinks/YandexMessenger
+   ../configuration/sinks/jira
+   ../configuration/sinks/webhook
+   ../configuration/sinks/file
+   ../configuration/sinks/webex
+   ../configuration/sinks/kafka
+   ../configuration/sinks/rocketchat
+   ../configuration/sinks/mail
+   ../configuration/sinks/google_chat
+   ../configuration/sinks/pushover
+   ../configuration/sinks/ServiceNow
+   ../configuration/sinks/zulip
+   ../configuration/sinks/sinks-development
+
+.. admonition:: Sinks are a legacy feature of Robusta classic
+   :class: warning
+
+   For new setups, we recommend `HolmesGPT <https://holmesgpt.dev/>`_ instead.
+
+   HolmesGPT triages your alerts instead of just forwarding them. Sinks are deterministic: they send every notification, unchanged, to a fixed destination, leaving you to read and prioritize each one yourself.
+
+   HolmesGPT instead uses AI to investigate each alert, surface the likely root cause, and escalate only what needs attention — so you get fewer, more actionable notifications. Set this up with `Alerts Triage <https://platform.robusta.dev/holmes/alerts-triage>`_ for alerts, or :ref:`Triggered Workflows <defining-playbooks>` for custom events.
+
+Robusta can send notifications to various destinations, called sinks.
+
+A Simple Sink Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Sinks are defined in Robusta's Helm chart, using the ``sinksConfig`` value.
+
+For example, lets add a :ref:`Microsoft Teams Sink <MS Teams>`:
+
+.. code-block:: yaml
+
+    sinksConfig:
+    - ms_teams_sink:                  # sink type
+        name: my_teams_sink           # name that uniquely identifies this sink in Robusta
+        webhook_url: <placeholder>    # the webhook URL for MSTeams - each sink has different parameters like this
+
+For all options, refer to :ref:`All Sink Options`.
+
+Defining Multiple Sinks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+You can define multiple sinks. By default, notifications will be sent to all of them.
+
+In the following example, we define a :ref:`Slack sink <Slack>` and a :ref:`MS Teams sink <MS Teams>` without any routing rules, so both sinks receive all notifications:
+
+.. code-block:: yaml
+
+    sinksConfig:
+    - slack_sink:
+        name: my_slack_sink
+        slack_channel: my-channel
+        api_key: secret-key
+    - ms_teams_sink:
+        name: my_teams_sink
+        webhook_url: <placeholder>
+
+To selectively send notifications to different sinks, refer to :ref:`routing (scopes) <sink-scope-matching>`.
+
+
+All Sink Options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Here is an example showing common sink options:
+
+.. code-block:: yaml
+
+    sinksConfig:
+    - slack_sink:                     # sink type
+        name: my_sink_name            # name that uniquely identifies this sink in Robusta
+        scope: {}                     # optional - filter notifications sent to this sink
+        activity: {}                  # optional - enable/disable sink according to time of day/week
+        stop: false                   # optional - stop notifications from continuing to subsequent sinks
+        grouping: {}                  # optional - use grouping to reduce the number of notifications (i.e. group into slack threads)
+        default: true                 # optional - disable this sink by default
+
+        # sink-specific parameters - e.g. for Slack, some options are shown below
+        # api_key: xoxb-112...
+        # slack_channel: general-alerts
+
+Description of each option:
+
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| Parameter Name   | Description                                             | Default                                                  | Docs                                          |
++==================+=========================================================+==========================================================+===============================================+
+| name             | A unique name for this sink in Robusta                  | -                                                        | -                                             |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| scope            | Filters the notifications sent to this sink             | *undefined* - all notifications are sent (unless already |                                               |
+|                  |                                                         | sent a previou sink that set `stop: true`)               | :ref:`Routing (scopes) <sink-scope-matching>` |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| activity         | Controls the hours this sink is active                  | *undefined* - active all hours and all days of the week  | :ref:`Route by Time`                          |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| stop             | Should notifications continue to subsequent sinks?      | false - notification sent to this sink will continue to  | :ref:`Stop Further Notifications`             |
+|                  |                                                         | subsequent sinks                                         |                                               |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| grouping         | Currently only impacts the Slack sink, where it controls| *undefined* (disabled)                                   | :ref:`Grouping <notification-grouping>`       | 
+|                  | the creation of threads and the grouping of many        |                                                          |                                               |
+|                  | notifications into one message                          |                                                          |                                               |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| default          | Is this sink enabled by default? When false, this sink  | true - this sink is enabled by default                   | :ref:`Alternative Routing Methods`            |
+|                  | only accepts notifications from customPlaybooks which   |                                                          |                                               |
+|                  | explicitly named this sink (if scope is set, it will    |                                                          |                                               |
+|                  | still filter those notifications)                       |                                                          |                                               |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+| *sink specific*  | Parameters specific to the sink type, like api_key for  | -                                                        | :ref:`sink-specific docs <sinks-reference>`   |
+| *parameters*     | Slack and webhook_url for MSTeams                       |                                                          |                                               |
++------------------+---------------------------------------------------------+----------------------------------------------------------+-----------------------------------------------+
+
+Ignoring Sinks Initialization Errors
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, when Robusta fails to initialize any of the Sinks, it will not start.
+
+On some scenarios, you may want to ignore Sinks initialization errors.
+
+For example, if Robusta is not allowed to connect to Slack, but you still want to receive notifications on the Robusta UI.
+
+In order to enable that, add the below to ``globalConfig`` in your ``generated_values.yaml`` file:
+
+.. code-block:: yaml
+
+    globalConfig:
+      continue_on_sink_errors: True
+
+Learn More
+^^^^^^^^^^^^
+
+* 🔔 :ref:`All Sinks <sinks-reference>`
+* ↳ :ref:`Routing (scopes) <sink-scope-matching>`
