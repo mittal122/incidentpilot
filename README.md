@@ -26,10 +26,16 @@ console UI:
 ## Run the console locally
 
 ```bash
+./run.sh          # does everything: venv, deps, Holmes port-forward, server
+# open http://localhost:8010
+```
+
+Manual equivalent:
+
+```bash
 python3 -m venv .venv && .venv/bin/pip install -r console/requirements.txt
 kubectl port-forward svc/robusta-holmes 10001:80 &   # Holmes API
 .venv/bin/uvicorn console.main:app --host 0.0.0.0 --port 8010
-# open http://localhost:8010
 ```
 
 Env vars: `HOLMES_URL` (default `http://localhost:10001`), `HOLMES_MODEL`
