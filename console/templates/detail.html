@@ -14,7 +14,7 @@
   <h2>Root cause (HolmesGPT)</h2>
   <div id="investigation">
     {% if i.investigation %}
-      <pre class="investigation">{{ i.investigation }}</pre>
+      {{ i.investigation_html|safe }}
     {% else %}
       <button hx-post="/incidents/{{ i.id }}/investigate" hx-target="#investigation"
               hx-swap="innerHTML" hx-indicator="#inv-spinner">🔎 Investigate with Holmes</button>

@@ -1,0 +1,6 @@
+[  163760ms] [ERROR] Fetch API cannot load about:blank. URL scheme "about" is not supported. @ :0
+[  163854ms] TypeError: Failed to fetch
+    at eval (eval at <anonymous> (eval at evaluate (:311:30)), <anonymous>:1:10)
+    at eval (eval at evaluate (:311:30), <anonymous>:4:50)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)

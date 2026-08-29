@@ -3,3 +3,5 @@ uvicorn[standard]
 jinja2
 httpx
 python-multipart
+markdown
+nh3

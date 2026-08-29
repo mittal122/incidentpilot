@@ -15,6 +15,8 @@ from html import escape
 from pathlib import Path
 
 import httpx
+import markdown as md_lib
+import nh3
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -126,7 +128,44 @@ def incident_detail(request: Request, incident_id: str):
         return HTMLResponse("incident not found", status_code=404)
     i = dict(row)
     i["raw_pretty"] = json.dumps(json.loads(i["raw"] or "{}"), indent=2)
+    if i.get("investigation"):
+        i["investigation_html"] = render_ai(i["investigation"])
     return render(request, "detail.html", page="incidents", i=i)
+
+
+# ── AI response rendering ────────────────────────────────────────────
+
+# words that get a colored status chip when they appear in AI output
+BADGES = {
+    "ok": ("Healthy", "Running", "Online", "Ready", "Connected", "Succeeded"),
+    "warn": ("Warning", "Degraded", "Pending", "Unknown"),
+    "err": ("Error", "Critical", "Unhealthy", "Failed", "CrashLoopBackOff",
+            "ImagePullBackOff", "ErrImagePull", "OOMKilled", "Offline"),
+}
+BADGE_RE = re.compile(
+    r"\b(" + "|".join(w for ws in BADGES.values() for w in ws) + r")\b"
+)
+BADGE_CLASS = {w: cls for cls, ws in BADGES.items() for w in ws}
+
+MD_STYLE_HINT = (
+    "\n\nFormat the answer in Markdown for a dashboard: start with one bold "
+    "one-line summary, use a table when listing pods/resources (columns like "
+    "namespace, pod, status, reason, action), bullet lists for steps, and "
+    "`inline code` for names. Be compact — scannable in seconds."
+)
+
+
+def render_ai(text: str) -> str:
+    """Markdown -> sanitized HTML with status badges, for AI responses."""
+    html = md_lib.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
+    html = nh3.clean(html, attributes={"a": {"href"}, "span": {"class"},
+                                       "code": {"class"}, "th": {"align"},
+                                       "td": {"align"}})
+    html = BADGE_RE.sub(
+        lambda m: f'<span class="chip {BADGE_CLASS[m.group(1)]}">{m.group(1)}</span>',
+        html,
+    )
+    return f'<div class="ai-md">{html}</div>'
 
 
 # ── HolmesGPT ────────────────────────────────────────────────────────
@@ -154,7 +193,7 @@ def investigate(incident_id: str):
         f"Alert: {row['title']}\n"
         f"Severity: {row['severity']}\n"
         f"Resource: {row['kind']} {row['namespace']}/{row['resource']}\n"
-        f"Details: {row['description'] or '(none)'}"
+        f"Details: {row['description'] or '(none)'}" + MD_STYLE_HINT
     )
     try:
         analysis = ask_holmes(question)
@@ -165,7 +204,7 @@ def investigate(incident_id: str):
             "UPDATE incidents SET investigation = ? WHERE id = ?",
             (analysis, incident_id),
         )
-    return HTMLResponse(f'<pre class="investigation">{escape(analysis)}</pre>')
+    return HTMLResponse(render_ai(analysis))
 
 
 @app.get("/chat", response_class=HTMLResponse)
@@ -176,12 +215,11 @@ def chat_page(request: Request):
 @app.post("/api/chat", response_class=HTMLResponse)
 def chat(ask: str = Form(...)):
     try:
-        analysis = ask_holmes(ask)
+        body = render_ai(ask_holmes(ask + MD_STYLE_HINT))
     except Exception as e:
-        analysis = f"Holmes error: {e}"
+        body = f'<div class="action-err">Holmes error: {escape(str(e))}</div>'
     return HTMLResponse(
-        f'<div class="chat-entry"><div class="q">You: {escape(ask)}</div>'
-        f"<pre>{escape(analysis)}</pre></div>"
+        f'<div class="chat-entry"><div class="q">You: {escape(ask)}</div>{body}</div>'
     )
 
 
@@ -427,7 +465,7 @@ def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
         analysis = ask_holmes(question)
     except Exception as e:
         return HTMLResponse(f'<div class="action-err">Holmes error: {escape(str(e))}</div>')
-    return HTMLResponse(f'<pre class="investigation">{escape(analysis)}</pre>')
+    return HTMLResponse(render_ai(analysis))
 
 
 # ── actions ──────────────────────────────────────────────────────────

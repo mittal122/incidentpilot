@@ -1,0 +1,18 @@
+- generic [ref=f11e1]:
+  - banner [ref=f11e2]:
+    - generic [ref=f11e3]: ⛑ incidentpilot
+    - navigation [ref=f11e4]:
+      - link "Overview" [ref=f11e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=f11e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=f11e7] [cursor=pointer]:
+        - /url: /chat
+    - generic [ref=f11e8]: "cluster: incidentpilot-dev"
+  - main [ref=f11e9]:
+    - heading "Ask Holmes" [level=1] [ref=f11e10]
+    - paragraph [ref=f11e11]: Free-form questions about the cluster. Holmes has access to kubectl, Prometheus and Loki toolsets.
+    - generic [ref=f11e12]:
+      - textbox "e.g. why is my pod crashing in namespace robusta-test?" [active] [ref=f11e13]: Which pods or projects are unhealthy right now?
+      - button "Ask" [ref=f11e14] [cursor=pointer]
+      - generic [ref=f11e15]: investigating…
