@@ -5,3 +5,4 @@ httpx
 python-multipart
 markdown
 nh3
+pyyaml

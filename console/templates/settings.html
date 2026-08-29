@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Settings · Incident Console{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings — AI providers</h1>
+    <p class="muted">Configure the LLM behind HolmesGPT. Keys are stored in the console database and, for the active provider, in the Holmes ConfigMap (readable by cluster admins).</p>
+  </div>
+</div>
+<input type="text" id="provider-search" class="settings-search" placeholder="Search providers or models…"
+       oninput="document.querySelectorAll('.provider-card').forEach(c => c.style.display = c.textContent.toLowerCase().includes(this.value.toLowerCase()) ? '' : 'none')">
+<div class="provider-list">
+  {% for p in providers %}
+  <div class="provider-card" id="card-{{ p.id }}">
+    {% with p=p %}{% include "_provider_card.html" %}{% endwith %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

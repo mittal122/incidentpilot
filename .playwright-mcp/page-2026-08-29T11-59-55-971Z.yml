@@ -1,0 +1,230 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ⛑ incidentpilot
+    - navigation [ref=e4]:
+      - link "Overview" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=e7] [cursor=pointer]:
+        - /url: /chat
+      - link "Settings" [ref=e8] [cursor=pointer]:
+        - /url: /settings
+    - generic [ref=e9]: "cluster: incidentpilot-dev"
+  - main [ref=e10]:
+    - generic [ref=e12]:
+      - heading "Settings — AI providers" [level=1] [ref=e13]
+      - paragraph [ref=e14]: Configure the LLM behind HolmesGPT. Keys are stored in the console database and, for the active provider, in the Holmes ConfigMap (readable by cluster admins).
+    - textbox "Search providers or models…" [ref=e15]
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e20]: OpenRouter
+          - generic [ref=e21]: https://openrouter.ai/api/v1
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]: Connection
+            - generic [ref=e25]: Untested
+          - generic [ref=e26]:
+            - generic [ref=e27]: Key
+            - generic [ref=e28]: not set
+          - generic [ref=e29]:
+            - generic [ref=e30]: Latency
+            - generic [ref=e31]: —
+          - generic [ref=e32]:
+            - generic [ref=e33]: Last OK
+            - generic [ref=e34]: never
+          - generic [ref=e35]:
+            - generic [ref=e36]: Model
+            - code [ref=e37]: anthropic/claude-sonnet-4.5
+        - generic [ref=e38]:
+          - textbox "paste API key" [ref=e39]
+          - textbox "model id" [ref=e40]: anthropic/claude-sonnet-4.5
+          - button "Save" [ref=e41] [cursor=pointer]
+          - button "Test connection" [ref=e42] [cursor=pointer]
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e46]: Anthropic (Claude)
+          - generic [ref=e47]: https://api.anthropic.com/v1
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - generic [ref=e50]: Connection
+            - generic [ref=e51]: Untested
+          - generic [ref=e52]:
+            - generic [ref=e53]: Key
+            - generic [ref=e54]: not set
+          - generic [ref=e55]:
+            - generic [ref=e56]: Latency
+            - generic [ref=e57]: —
+          - generic [ref=e58]:
+            - generic [ref=e59]: Last OK
+            - generic [ref=e60]: never
+          - generic [ref=e61]:
+            - generic [ref=e62]: Model
+            - code [ref=e63]: claude-sonnet-4-5
+        - generic [ref=e64]:
+          - textbox "paste API key" [ref=e65]
+          - textbox "model id" [ref=e66]: claude-sonnet-4-5
+          - button "Save" [ref=e67] [cursor=pointer]
+          - button "Test connection" [ref=e68] [cursor=pointer]
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - generic [ref=e72]: OpenAI (ChatGPT)
+          - generic [ref=e73]: https://api.openai.com/v1
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - generic [ref=e76]: Connection
+            - generic [ref=e77]: Untested
+          - generic [ref=e78]:
+            - generic [ref=e79]: Key
+            - generic [ref=e80]: not set
+          - generic [ref=e81]:
+            - generic [ref=e82]: Latency
+            - generic [ref=e83]: —
+          - generic [ref=e84]:
+            - generic [ref=e85]: Last OK
+            - generic [ref=e86]: never
+          - generic [ref=e87]:
+            - generic [ref=e88]: Model
+            - code [ref=e89]: gpt-4o
+        - generic [ref=e90]:
+          - textbox "paste API key" [ref=e91]
+          - textbox "model id" [ref=e92]: gpt-4o
+          - button "Save" [ref=e93] [cursor=pointer]
+          - button "Test connection" [ref=e94] [cursor=pointer]
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - generic [ref=e98]: Google Gemini
+          - generic [ref=e99]: https://generativelanguage.googleapis.com
+        - generic [ref=e100]:
+          - generic [ref=e101]:
+            - generic [ref=e102]: Connection
+            - generic [ref=e103]: Untested
+          - generic [ref=e104]:
+            - generic [ref=e105]: Key
+            - generic [ref=e106]: not set
+          - generic [ref=e107]:
+            - generic [ref=e108]: Latency
+            - generic [ref=e109]: —
+          - generic [ref=e110]:
+            - generic [ref=e111]: Last OK
+            - generic [ref=e112]: never
+          - generic [ref=e113]:
+            - generic [ref=e114]: Model
+            - code [ref=e115]: gemini-2.5-flash
+        - generic [ref=e116]:
+          - textbox "paste API key" [ref=e117]
+          - textbox "model id" [ref=e118]: gemini-2.5-flash
+          - button "Save" [ref=e119] [cursor=pointer]
+          - button "Test connection" [ref=e120] [cursor=pointer]
+      - generic [ref=e121]:
+        - generic [ref=e122]:
+          - generic [ref=e124]: NVIDIA NIM
+          - generic [ref=e125]: Active
+          - generic [ref=e126]: https://integrate.api.nvidia.com/v1
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e129]: Connection
+            - generic [ref=e130]: Connected
+          - generic [ref=e131]:
+            - generic [ref=e132]: Key
+            - generic [ref=e133]: Valid
+          - generic [ref=e134]:
+            - generic [ref=e135]: Latency
+            - generic [ref=e136]: 5266 ms
+          - generic [ref=e137]:
+            - generic [ref=e138]: Last OK
+            - generic [ref=e139]: 2026-08-29 11:58:08 UTC
+          - generic [ref=e140]:
+            - generic [ref=e141]: Model
+            - code [ref=e142]: nvidia/nemotron-3.5-lightning-30b-a3b
+        - generic [ref=e143]: ℹ NVIDIA NIM does not expose usage/quota via API — check your provider dashboard for billing.
+        - generic [ref=e144]:
+          - textbox "•••• L1yD" [ref=e145]
+          - combobox [ref=e146]:
+            - option "01-ai/yi-large"
+            - option "adept/fuyu-8b"
+            - option "ai21labs/jamba-1.5-large-instruct"
+            - option "aisingapore/sea-lion-7b-instruct"
+            - option "bigcode/starcoder2-15b"
+            - option "databricks/dbrx-instruct"
+            - option "deepseek-ai/deepseek-coder-6.7b-instruct"
+            - option "deepseek-ai/deepseek-v4-flash-0731"
+            - option "deepseek-ai/deepseek-v4-pro-0813"
+            - option "google/codegemma-1.1-7b"
+            - option "google/codegemma-7b"
+            - option "google/deplot"
+            - option "google/diffusiongemma-26b-a4b-it"
+            - option "google/gemma-2b"
+            - option "google/gemma-3-12b-it"
+            - option "google/gemma-3-4b-it"
+            - option "google/gemma-4-31b-it"
+            - option "google/recurrentgemma-2b"
+            - option "ibm/granite-3.0-3b-a800m-instruct"
+            - option "ibm/granite-3.0-8b-instruct"
+            - option "ibm/granite-34b-code-instruct"
+            - option "ibm/granite-8b-code-instruct"
+            - option "meta/codellama-70b"
+            - option "meta/llama-3.2-11b-vision-instruct"
+            - option "meta/llama-3.2-90b-vision-instruct"
+            - option "meta/llama-guard-4-12b"
+            - option "meta/llama2-70b"
+            - option "meta/muse-glimmer-30b"
+            - option "microsoft/kosmos-2"
+            - option "microsoft/phi-3-vision-128k-instruct"
+            - option "microsoft/phi-3.5-moe-instruct"
+            - option "minimaxai/minimax-m3"
+            - option "mistralai/codestral-22b-instruct-v0.1"
+            - option "mistralai/mistral-7b-instruct-v0.3"
+            - option "mistralai/mistral-large"
+            - option "mistralai/mistral-large-2-instruct"
+            - option "mistralai/mistral-nemotron"
+            - option "mistralai/mixtral-8x22b-v0.1"
+            - option "moonshotai/kimi-k2.6"
+            - option "moonshotai/kimi-k3"
+            - option "nv-mistralai/mistral-nemo-12b-instruct"
+            - option "nvidia/ai-synthetic-video-detector"
+            - option "nvidia/cosmos-reason2-8b"
+            - option "nvidia/embed-qa-4"
+            - option "nvidia/ising-calibration-1.5-31b"
+            - option "nvidia/llama-3.1-nemoguard-8b-content-safety"
+            - option "nvidia/llama-3.1-nemoguard-8b-topic-control"
+            - option "nvidia/llama-3.1-nemotron-51b-instruct"
+            - option "nvidia/llama-3.1-nemotron-70b-instruct"
+            - option "nvidia/llama-3.1-nemotron-safety-guard-8b-v3"
+            - option "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+            - option "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1"
+            - option "nvidia/llama-3.2-nv-embedqa-1b-v1"
+            - option "nvidia/llama-nemotron-embed-vl-1b-v2"
+            - option "nvidia/llama3-chatqa-1.5-70b"
+            - option "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+            - option "nvidia/nemotron-3-embed-1b"
+            - option "nvidia/nemotron-3-nano-30b-a3b"
+            - option "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+            - option "nvidia/nemotron-3-super-120b-a12b"
+            - option "nvidia/nemotron-3-ultra-550b-a55b"
+            - option "nvidia/nemotron-3.5-content-safety"
+            - option "nvidia/nemotron-3.5-lightning-30b-a3b" [selected]
+            - option "nvidia/nemotron-4-340b-instruct"
+            - option "nvidia/nemotron-4-340b-reward"
+            - option "nvidia/nemotron-nano-3-30b-a3b"
+            - option "nvidia/nemotron-parse"
+            - option "nvidia/neva-22b"
+            - option "nvidia/nv-embedqa-mistral-7b-v2"
+            - option "nvidia/nvclip"
+            - option "nvidia/riva-translate-4b-instruct"
+            - option "nvidia/riva-translate-4b-instruct-v1.1"
+            - option "nvidia/riva-translate-4b-instruct-v2"
+            - option "nvidia/vila"
+            - option "openai/gpt-oss-120b"
+            - option "openai/gpt-oss-20b"
+            - option "poolside/laguna-xs-2.1"
+            - option "snowflake/arctic-embed-l"
+            - option "writer/palmyra-creative-122b"
+            - option "writer/palmyra-fin-70b-32k"
+            - option "writer/palmyra-med-70b"
+            - option "writer/palmyra-med-70b-32k"
+            - option "zyphra/zamba2-7b-instruct"
+          - button "Save" [ref=e147] [cursor=pointer]
+          - button "Test connection" [ref=e148] [cursor=pointer]
+          - button "Remove" [ref=e149] [cursor=pointer]

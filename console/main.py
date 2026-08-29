@@ -48,6 +48,19 @@ def db() -> sqlite3.Connection:
             created_at TEXT
         )"""
     )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS providers (
+            provider TEXT PRIMARY KEY,
+            api_key TEXT,
+            model TEXT,
+            active INTEGER DEFAULT 0,
+            status TEXT,            -- last test outcome: ok / error text
+            latency_ms INTEGER,
+            last_ok TEXT,           -- timestamp of last successful test
+            models_json TEXT,       -- models discovered on last test
+            usage_json TEXT         -- quota info if the provider exposes it
+        )"""
+    )
     return conn
 
 
@@ -133,6 +146,151 @@ def incident_detail(request: Request, incident_id: str):
     return render(request, "detail.html", page="incidents", i=i)
 
 
+# ── AI provider settings ─────────────────────────────────────────────
+# The user manages their own provider API keys on the /settings page.
+# Keys are stored in the console DB and, when a provider is activated,
+# written into Holmes' model_list ConfigMap (plaintext in both — same
+# trust level as the existing Robusta install; noted in the UI).
+
+PROVIDERS = {
+    "openrouter": {
+        "label": "OpenRouter",
+        "endpoint": "https://openrouter.ai/api/v1",
+        "models_url": "https://openrouter.ai/api/v1/models",
+        "litellm": lambda m: {"model": f"openrouter/{m}"},
+        "default_model": "anthropic/claude-sonnet-4.5",
+        "has_usage_api": True,
+    },
+    "anthropic": {
+        "label": "Anthropic (Claude)",
+        "endpoint": "https://api.anthropic.com/v1",
+        "models_url": "https://api.anthropic.com/v1/models",
+        "litellm": lambda m: {"model": f"anthropic/{m}"},
+        "default_model": "claude-sonnet-4-5",
+        "has_usage_api": False,
+    },
+    "openai": {
+        "label": "OpenAI (ChatGPT)",
+        "endpoint": "https://api.openai.com/v1",
+        "models_url": "https://api.openai.com/v1/models",
+        "litellm": lambda m: {"model": f"openai/{m}"},
+        "default_model": "gpt-4o",
+        "has_usage_api": False,
+    },
+    "gemini": {
+        "label": "Google Gemini",
+        "endpoint": "https://generativelanguage.googleapis.com",
+        "models_url": "https://generativelanguage.googleapis.com/v1beta/models",
+        "litellm": lambda m: {"model": f"gemini/{m}"},
+        "default_model": "gemini-2.5-flash",
+        "has_usage_api": False,
+    },
+    "nvidia": {
+        "label": "NVIDIA NIM",
+        "endpoint": "https://integrate.api.nvidia.com/v1",
+        "models_url": "https://integrate.api.nvidia.com/v1/models",
+        "litellm": lambda m: {"model": f"openai/{m}",
+                              "api_base": "https://integrate.api.nvidia.com/v1"},
+        "default_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "has_usage_api": False,
+    },
+}
+
+
+def provider_auth(provider: str, api_key: str) -> dict:
+    if provider == "anthropic":
+        return {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
+    if provider == "gemini":
+        return {"x-goog-api-key": api_key}
+    return {"Authorization": f"Bearer {api_key}"}
+
+
+def test_provider(provider: str, api_key: str) -> dict:
+    """Validate the key by listing the provider's models; measure latency."""
+    import time as _t
+    p = PROVIDERS[provider]
+    t = _t.time()
+    try:
+        r = httpx.get(p["models_url"], headers=provider_auth(provider, api_key),
+                      timeout=15)
+        latency = int((_t.time() - t) * 1000)
+        if r.status_code in (401, 403):
+            return {"ok": False, "latency_ms": latency,
+                    "error": f"API key rejected (HTTP {r.status_code})"}
+        r.raise_for_status()
+        body = r.json()
+        raw = body.get("data") or body.get("models") or []
+        models = sorted((m.get("id") or m.get("name", "")).removeprefix("models/")
+                        for m in raw)
+        return {"ok": True, "latency_ms": latency, "models": models}
+    except Exception as e:
+        return {"ok": False, "latency_ms": int((_t.time() - t) * 1000),
+                "error": str(e)[:200]}
+
+
+def fetch_provider_usage(provider: str, api_key: str) -> dict | None:
+    """Quota/usage where the provider has an API for it (only OpenRouter)."""
+    if not PROVIDERS[provider]["has_usage_api"]:
+        return None
+    try:
+        r = httpx.get("https://openrouter.ai/api/v1/auth/key",
+                      headers=provider_auth(provider, api_key), timeout=15)
+        r.raise_for_status()
+        d = r.json().get("data", {})
+        return {k: d.get(k) for k in
+                ("usage", "limit", "limit_remaining", "is_free_tier", "rate_limit")}
+    except Exception as e:
+        return {"error": str(e)[:150]}
+
+
+HOLMES_CONFIGMAP = "custom-toolsets-configmap"
+
+
+def activate_in_holmes(provider: str, api_key: str, model: str) -> str:
+    """Write the chosen model into Holmes' model list and restart Holmes.
+
+    Returns the model alias. NOTE: a later `helm upgrade` overwrites the
+    ConfigMap — mirror the entry into Helm values to make it permanent.
+    """
+    import yaml
+    alias = f"console-{provider}"
+    out = subprocess.run(
+        ["kubectl", "get", "configmap", HOLMES_CONFIGMAP, "-n", "default",
+         "-o", "jsonpath={.data.model_list\\.yaml}"],
+        capture_output=True, text=True, timeout=30,
+    )
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    model_list = yaml.safe_load(out.stdout) or {}
+    entry = dict(PROVIDERS[provider]["litellm"](model))
+    entry["api_key"] = api_key
+    entry["temperature"] = 0
+    model_list[alias] = entry
+    patch = json.dumps({"data": {"model_list.yaml": yaml.safe_dump(model_list)}})
+    out = subprocess.run(
+        ["kubectl", "patch", "configmap", HOLMES_CONFIGMAP, "-n", "default",
+         "--type", "merge", "-p", patch],
+        capture_output=True, text=True, timeout=30,
+    )
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    subprocess.run(
+        ["kubectl", "rollout", "restart", "deployment/robusta-holmes",
+         "-n", "default"],
+        capture_output=True, text=True, timeout=30,
+    )
+    return alias
+
+
+def active_model() -> str:
+    """Model alias for Holmes calls: the activated provider, else default."""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT provider FROM providers WHERE active = 1"
+        ).fetchone()
+    return f"console-{row['provider']}" if row else HOLMES_MODEL
+
+
 # ── AI response rendering ────────────────────────────────────────────
 
 # words that get a colored status chip when they appear in AI output
@@ -173,7 +331,7 @@ def render_ai(text: str) -> str:
 def ask_holmes(question: str) -> str:
     resp = httpx.post(
         f"{HOLMES_URL}/api/chat",
-        json={"ask": question, "model": HOLMES_MODEL},
+        json={"ask": question, "model": active_model()},
         timeout=httpx.Timeout(600, connect=10),
     )
     resp.raise_for_status()
@@ -466,6 +624,120 @@ def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
     except Exception as e:
         return HTMLResponse(f'<div class="action-err">Holmes error: {escape(str(e))}</div>')
     return HTMLResponse(render_ai(analysis))
+
+
+# ── settings page ────────────────────────────────────────────────────
+
+def mask_key(key: str | None) -> str:
+    if not key:
+        return ""
+    return "•••• " + key[-4:] if len(key) > 8 else "••••"
+
+
+def settings_rows() -> list[dict]:
+    with db() as conn:
+        saved = {r["provider"]: dict(r) for r in
+                 conn.execute("SELECT * FROM providers").fetchall()}
+    rows = []
+    for pid, meta in PROVIDERS.items():
+        row = saved.get(pid, {})
+        rows.append({
+            "id": pid, **meta,
+            "configured": bool(row.get("api_key")),
+            "masked_key": mask_key(row.get("api_key")),
+            "model": row.get("model") or meta["default_model"],
+            "active": bool(row.get("active")),
+            "status": row.get("status"),
+            "latency_ms": row.get("latency_ms"),
+            "last_ok": row.get("last_ok"),
+            "models": json.loads(row.get("models_json") or "[]"),
+            "usage": json.loads(row.get("usage_json") or "null"),
+        })
+    return rows
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return render(request, "settings.html", page="settings",
+                  providers=settings_rows())
+
+
+def _provider_card(request: Request, pid: str) -> HTMLResponse:
+    row = next(r for r in settings_rows() if r["id"] == pid)
+    return render(request, "_provider_card.html", p=row)
+
+
+@app.post("/settings/{pid}/save", response_class=HTMLResponse)
+def settings_save(request: Request, pid: str, api_key: str = Form(""),
+                  model: str = Form("")):
+    if pid not in PROVIDERS:
+        return HTMLResponse("unknown provider", status_code=404)
+    with db() as conn:
+        existing = conn.execute(
+            "SELECT api_key FROM providers WHERE provider = ?", (pid,)
+        ).fetchone()
+        key = api_key.strip() or (existing["api_key"] if existing else "")
+        conn.execute(
+            "INSERT INTO providers (provider, api_key, model) VALUES (?,?,?)"
+            " ON CONFLICT(provider) DO UPDATE SET api_key = ?, model = ?",
+            (pid, key, model, key, model),
+        )
+    return _provider_card(request, pid)
+
+
+@app.post("/settings/{pid}/delete", response_class=HTMLResponse)
+def settings_delete(request: Request, pid: str):
+    with db() as conn:
+        conn.execute("DELETE FROM providers WHERE provider = ?", (pid,))
+    return _provider_card(request, pid)
+
+
+@app.post("/settings/{pid}/test", response_class=HTMLResponse)
+def settings_test(request: Request, pid: str):
+    if pid not in PROVIDERS:
+        return HTMLResponse("unknown provider", status_code=404)
+    with db() as conn:
+        row = conn.execute(
+            "SELECT api_key FROM providers WHERE provider = ?", (pid,)
+        ).fetchone()
+    if not row or not row["api_key"]:
+        return HTMLResponse('<div class="action-err">save an API key first</div>')
+    result = test_provider(pid, row["api_key"])
+    usage = fetch_provider_usage(pid, row["api_key"]) if result["ok"] else None
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    with db() as conn:
+        conn.execute(
+            "UPDATE providers SET status = ?, latency_ms = ?, last_ok = "
+            "COALESCE(?, last_ok), models_json = ?, usage_json = ? WHERE provider = ?",
+            ("ok" if result["ok"] else result.get("error", "error"),
+             result["latency_ms"], now if result["ok"] else None,
+             json.dumps(result.get("models", [])[:400]),
+             json.dumps(usage), pid),
+        )
+    return _provider_card(request, pid)
+
+
+@app.post("/settings/{pid}/activate", response_class=HTMLResponse)
+def settings_activate(request: Request, pid: str):
+    if pid not in PROVIDERS:
+        return HTMLResponse("unknown provider", status_code=404)
+    with db() as conn:
+        row = conn.execute(
+            "SELECT api_key, model FROM providers WHERE provider = ?", (pid,)
+        ).fetchone()
+    if not row or not row["api_key"]:
+        return HTMLResponse('<div class="action-err">save an API key first</div>')
+    try:
+        activate_in_holmes(pid, row["api_key"], row["model"])
+    except Exception as e:
+        return HTMLResponse(f'<div class="action-err">activation failed: {escape(str(e))}</div>')
+    with db() as conn:
+        conn.execute("UPDATE providers SET active = 0")
+        conn.execute("UPDATE providers SET active = 1 WHERE provider = ?", (pid,))
+    return HTMLResponse(
+        '<div class="action-ok">✓ Activated — Holmes is restarting (~1 min). '
+        'If running locally, re-run ./run.sh to refresh the port-forward.</div>'
+    )
 
 
 # ── actions ──────────────────────────────────────────────────────────

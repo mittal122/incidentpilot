@@ -1,0 +1,72 @@
+<div class="provider-head">
+  <span class="status-dot {% if p.active %}ok{% elif p.status == 'ok' %}ok{% elif p.status %}crit{% else %}warn{% endif %}"></span>
+  <span class="provider-name">{{ p.label }}</span>
+  {% if p.active %}<span class="pill ok">Active</span>{% endif %}
+  <span class="muted endpoint">{{ p.endpoint }}</span>
+</div>
+
+<div class="provider-status">
+  <div class="stat"><span class="s-label">Connection</span>
+    {% if p.status == 'ok' %}<span class="chip ok">Connected</span>
+    {% elif p.status %}<span class="chip err">Disconnected</span>
+    {% else %}<span class="chip warn">Untested</span>{% endif %}</div>
+  <div class="stat"><span class="s-label">Key</span>
+    {% if p.status == 'ok' %}<span class="chip ok">Valid</span>
+    {% elif p.status %}<span class="chip err">Invalid</span>
+    {% elif p.configured %}<span class="chip warn">Unverified</span>
+    {% else %}<span class="muted">not set</span>{% endif %}</div>
+  <div class="stat"><span class="s-label">Latency</span>
+    <span>{{ p.latency_ms ~ ' ms' if p.latency_ms else '—' }}</span></div>
+  <div class="stat"><span class="s-label">Last OK</span>
+    <span class="muted">{{ p.last_ok or 'never' }}</span></div>
+  <div class="stat"><span class="s-label">Model</span>
+    <code>{{ p.model }}</code></div>
+</div>
+
+{% if p.status and p.status != 'ok' %}
+<div class="action-err">✗ {{ p.status }}</div>
+{% endif %}
+
+{% if p.usage %}
+  {% if p.usage.error %}
+  <div class="muted usage-note">usage lookup failed: {{ p.usage.error }}</div>
+  {% else %}
+  <div class="provider-status">
+    <div class="stat"><span class="s-label">Credits used</span><span>${{ p.usage.usage }}</span></div>
+    <div class="stat"><span class="s-label">Limit</span><span>{{ ('$' ~ p.usage.limit) if p.usage.limit is not none else 'unlimited' }}</span></div>
+    <div class="stat"><span class="s-label">Remaining</span><span>{{ ('$' ~ p.usage.limit_remaining) if p.usage.limit_remaining is not none else '—' }}</span></div>
+    <div class="stat"><span class="s-label">Tier</span><span>{{ 'free' if p.usage.is_free_tier else 'paid' }}</span></div>
+  </div>
+  {% endif %}
+{% elif p.status == 'ok' and not p.has_usage_api %}
+<div class="muted usage-note">ℹ {{ p.label }} does not expose usage/quota via API — check your provider dashboard for billing.</div>
+{% endif %}
+
+<form class="provider-form" hx-post="/settings/{{ p.id }}/save" hx-target="#card-{{ p.id }}" hx-swap="innerHTML">
+  <input type="password" name="api_key" autocomplete="off"
+         placeholder="{{ p.masked_key or 'paste API key' }}">
+  {% if p.models %}
+  <select name="model">
+    {% for m in p.models %}<option value="{{ m }}" {% if m == p.model %}selected{% endif %}>{{ m }}</option>{% endfor %}
+  </select>
+  {% else %}
+  <input type="text" name="model" value="{{ p.model }}" placeholder="model id">
+  {% endif %}
+  <button type="submit">Save</button>
+  <button type="button" class="ghost" hx-post="/settings/{{ p.id }}/test"
+          hx-target="#card-{{ p.id }}" hx-swap="innerHTML"
+          hx-indicator="#spin-{{ p.id }}">Test connection</button>
+  {% if p.configured and not p.active %}
+  <button type="button" hx-post="/settings/{{ p.id }}/activate"
+          hx-target="#activate-result-{{ p.id }}" hx-swap="innerHTML"
+          hx-confirm="Switch Holmes to {{ p.label }} ({{ p.model }})? Holmes will restart."
+          hx-indicator="#spin-{{ p.id }}">Activate</button>
+  {% endif %}
+  {% if p.configured %}
+  <button type="button" class="ghost" hx-post="/settings/{{ p.id }}/delete"
+          hx-target="#card-{{ p.id }}" hx-swap="innerHTML"
+          hx-confirm="Remove the saved {{ p.label }} key?">Remove</button>
+  {% endif %}
+  <span id="spin-{{ p.id }}" class="htmx-indicator">working…</span>
+</form>
+<div id="activate-result-{{ p.id }}"></div>
