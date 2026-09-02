@@ -52,6 +52,22 @@ def db() -> sqlite3.Connection:
         )"""
     )
     conn.execute(
+        """CREATE TABLE IF NOT EXISTS conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            history_json TEXT,     -- Holmes conversation_history (LLM context)
+            created_at TEXT
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER,
+            html TEXT,             -- rendered chat entry (question + answer)
+            ts TEXT
+        )"""
+    )
+    conn.execute(
         """CREATE TABLE IF NOT EXISTS actions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts TEXT, namespace TEXT, target TEXT, verb TEXT,
@@ -356,15 +372,12 @@ def render_ai(text: str) -> str:
 
 # ── HolmesGPT ────────────────────────────────────────────────────────
 
-# ponytail: single-user console -> one module-level conversation; per-user
-# sessions when this ever becomes multi-user.
-CHAT_HISTORY: list[dict] = []
-
-
-def ask_holmes(question: str, use_history: bool = False) -> str:
+def ask_holmes(question: str, history: list | None = None) -> tuple[str, list]:
+    """Returns (analysis, new_history). Pass a conversation's stored history
+    for follow-up context; the returned history includes this exchange."""
     payload = {"ask": question, "model": active_model()}
-    if use_history and CHAT_HISTORY:
-        payload["conversation_history"] = CHAT_HISTORY
+    if history:
+        payload["conversation_history"] = history
     resp = httpx.post(
         f"{HOLMES_URL}/api/chat",
         json=payload,
@@ -372,11 +385,11 @@ def ask_holmes(question: str, use_history: bool = False) -> str:
     )
     resp.raise_for_status()
     body = resp.json()
-    if use_history:
-        history = body.get("conversation_history") or []
-        # cap growth: tool outputs make history heavy; reset keeps it usable
-        CHAT_HISTORY[:] = history if len(history) <= 60 else []
-    return body.get("analysis", "(no analysis returned)")
+    new_history = body.get("conversation_history") or []
+    # cap growth: tool outputs make history heavy; drop context past 60 msgs
+    if len(new_history) > 60:
+        new_history = []
+    return body.get("analysis", "(no analysis returned)"), new_history
 
 
 @app.post("/incidents/{incident_id}/investigate", response_class=HTMLResponse)
@@ -395,7 +408,7 @@ def investigate(incident_id: str):
         f"Details: {row['description'] or '(none)'}" + MD_STYLE_HINT
     )
     try:
-        analysis = ask_holmes(question)
+        analysis, _ = ask_holmes(question)
     except Exception as e:
         return HTMLResponse(f'<pre class="action-err">Holmes error: {e}</pre>')
     with db() as conn:
@@ -406,30 +419,76 @@ def investigate(incident_id: str):
     return HTMLResponse(render_ai(analysis))
 
 
+def conversation_list():
+    with db() as conn:
+        return conn.execute(
+            "SELECT id, title, created_at FROM conversations ORDER BY id DESC LIMIT 50"
+        ).fetchall()
+
+
 @app.get("/chat", response_class=HTMLResponse)
-def chat_page(request: Request):
-    return render(request, "chat.html", page="chat")
+def chat_page(request: Request, c: str = ""):
+    convs = conversation_list()
+    if c == "new":
+        active = 0          # fresh conversation: created on first message
+    elif c.isdigit():
+        active = int(c)
+    else:
+        active = convs[0]["id"] if convs else 0
+    with db() as conn:
+        msgs = conn.execute(
+            "SELECT html FROM messages WHERE conversation_id = ? ORDER BY id",
+            (active,),
+        ).fetchall() if active else []
+    return render(request, "chat.html", page="chat", conversations=convs,
+                  active_id=active, messages=msgs)
 
 
 @app.post("/api/chat", response_class=HTMLResponse)
-def chat(ask: str = Form(...)):
+def chat(ask: str = Form(...), conversation_id: int = Form(0)):
+    with db() as conn:
+        if not conversation_id:
+            cur = conn.execute(
+                "INSERT INTO conversations (title, history_json, created_at) VALUES (?,?,?)",
+                (ask[:60], "[]",
+                 datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")))
+            conversation_id = cur.lastrowid
+        row = conn.execute(
+            "SELECT history_json FROM conversations WHERE id = ?",
+            (conversation_id,)).fetchone()
+    history = json.loads(row["history_json"] or "[]") if row else []
+
     action = parse_action(ask)
     if action:
         body = action_response(action)
     else:
         try:
-            body = render_ai(ask_holmes(ask + MD_STYLE_HINT, use_history=True))
+            analysis, history = ask_holmes(ask + MD_STYLE_HINT, history=history)
+            body = render_ai(analysis)
         except Exception as e:
             body = f'<div class="action-err">Holmes error: {escape(str(e))}</div>'
+    entry = f'<div class="chat-entry"><div class="q">You: {escape(ask)}</div>{body}</div>'
+    with db() as conn:
+        conn.execute(
+            "UPDATE conversations SET history_json = ? WHERE id = ?",
+            (json.dumps(history), conversation_id))
+        conn.execute(
+            "INSERT INTO messages (conversation_id, html, ts) VALUES (?,?,?)",
+            (conversation_id, entry,
+             datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")))
+    # OOB swap keeps the hidden conversation_id current after a fresh chat
     return HTMLResponse(
-        f'<div class="chat-entry"><div class="q">You: {escape(ask)}</div>{body}</div>'
+        entry + f'<input type="hidden" name="conversation_id" id="conv-id"'
+                f' value="{conversation_id}" hx-swap-oob="true">'
     )
 
 
-@app.post("/api/chat/reset", response_class=HTMLResponse)
-def chat_reset():
-    CHAT_HISTORY.clear()
-    return HTMLResponse('<div class="muted" style="margin:.5rem 0">— new conversation —</div>')
+@app.post("/api/chat/{conv_id}/delete", response_class=HTMLResponse)
+def chat_delete(conv_id: int):
+    with db() as conn:
+        conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+        conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
+    return HTMLResponse(headers={"HX-Redirect": "/chat"})
 
 
 # ── Auto-Heal (user-requested per-namespace self-healing) ────────────
@@ -803,7 +862,7 @@ def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
         "If a section is empty write 'none'.\n\nLOGS:\n" + tail
     )
     try:
-        analysis = ask_holmes(question)
+        analysis, _ = ask_holmes(question)
     except Exception as e:
         return HTMLResponse(f'<div class="action-err">Holmes error: {escape(str(e))}</div>')
     return HTMLResponse(render_ai(analysis))

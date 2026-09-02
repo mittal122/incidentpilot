@@ -198,6 +198,28 @@ pre.terminal { background: #090c10; border: 1px solid var(--border); border-radi
   border-radius: 6px; padding: .5rem .8rem; color: var(--fg); }
 .provider-form select { max-width: 320px; }
 
+/* ── chat with history sidebar ─────────────────────────────────── */
+.chat-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem;
+  align-items: start; }
+.chat-sidebar { position: sticky; top: 4.2rem; }
+.new-chat { display: block; text-align: center; margin-bottom: .8rem; }
+.conv-list { display: flex; flex-direction: column; gap: .25rem;
+  max-height: 70vh; overflow-y: auto; }
+.conv-item { display: flex; align-items: center; border-radius: 8px;
+  border: 1px solid transparent; }
+.conv-item a { flex: 1; color: var(--muted); text-decoration: none;
+  padding: .45rem .7rem; font-size: .85rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.conv-item:hover { background: var(--panel); }
+.conv-item.active { background: var(--panel); border-color: var(--border); }
+.conv-item.active a { color: var(--fg); }
+.conv-del { background: none; border: 0; color: var(--muted); cursor: pointer;
+  padding: .3rem .5rem; font-size: .75rem; visibility: hidden; }
+.conv-item:hover .conv-del { visibility: visible; }
+.conv-del:hover { color: var(--high); }
+@media (max-width: 800px) { .chat-layout { grid-template-columns: 1fr; }
+  .chat-sidebar { position: static; } .conv-list { max-height: 60vh; } }
+
 .chat-entry { margin-bottom: 1.4rem; }
 .chat-entry .q { background: rgba(88, 166, 255, .08); border: 1px solid
   rgba(88, 166, 255, .25); border-radius: 10px; padding: .6rem .9rem;

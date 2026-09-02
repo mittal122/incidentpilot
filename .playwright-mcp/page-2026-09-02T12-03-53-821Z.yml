@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ⛑ incidentpilot
+    - navigation [ref=e4]:
+      - link "Overview" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=e7] [cursor=pointer]:
+        - /url: /chat
+      - link "Settings" [ref=e8] [cursor=pointer]:
+        - /url: /settings
+    - generic [ref=e9]: "cluster: incidentpilot-dev"
+  - main [ref=e10]:
+    - generic [ref=e11]:
+      - complementary [ref=e12]:
+        - link "＋ New chat" [ref=e13] [cursor=pointer]:
+          - /url: /chat?c=new
+        - link "describe pod cart-8687cb99dd-9cwlp in demo-lab" [ref=e16] [cursor=pointer]:
+          - /url: /chat?c=1
+      - generic [ref=e17]:
+        - heading "Ask Holmes" [level=1] [ref=e18]
+        - paragraph [ref=e19]:
+          - text: "Follow-ups remember context. Commands work too:"
+          - code [ref=e20]: restart pod NAME in NS
+          - text: ·
+          - code [ref=e21]: scale DEPLOY in NS to N
+          - text: ·
+          - code [ref=e22]: rollback DEPLOY in NS
+          - text: ·
+          - code [ref=e23]: describe pod NAME in NS
+          - text: — mutations always show an approval button first.
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - generic [ref=e26]: "You: describe pod cart-8687cb99dd-9cwlp in demo-lab"
+            - generic [ref=e27]: "Error from server (NotFound): pods \"cart-8687cb99dd-9cwlp\" not found"
+          - generic [ref=e28]:
+            - generic [ref=e29]: "You: Reply with the single word OK. No tools."
+            - paragraph [ref=e31]:
+              - strong [ref=e32]: OK
+        - generic [ref=e33]:
+          - textbox "e.g. why is my pod crashing in namespace demo-lab?" [ref=e34]
+          - button "Ask" [ref=e35] [cursor=pointer]

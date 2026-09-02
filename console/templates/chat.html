@@ -1,15 +1,49 @@
 {% extends "base.html" %}
 {% block title %}Ask Holmes · Incident Console{% endblock %}
 {% block content %}
-<h1>Ask Holmes</h1>
-<p class="muted">Free-form questions about the cluster — follow-ups remember context. Operational commands work too:
-<code>restart pod NAME in NAMESPACE</code> · <code>scale DEPLOY in NS to N</code> · <code>rollback DEPLOY in NS</code> · <code>describe pod NAME in NS</code> — mutations always show an approval button first.
-<button class="ghost" style="margin-left:.6rem" hx-post="/api/chat/reset" hx-target="#chat-log" hx-swap="beforeend">New chat</button></p>
-<div id="chat-log"></div>
-<form hx-post="/api/chat" hx-target="#chat-log" hx-swap="beforeend" hx-indicator="#chat-spinner"
-      hx-on::after-request="if(event.detail.successful) this.reset()">
-  <input type="text" name="ask" placeholder="e.g. why is my pod crashing in namespace robusta-test?" required autofocus>
-  <button type="submit">Ask</button>
-  <span id="chat-spinner" class="htmx-indicator">investigating…</span>
-</form>
+<div class="chat-layout">
+
+  <aside class="chat-sidebar">
+    <a class="btn-link new-chat" href="/chat?c=new">＋ New chat</a>
+    <div class="conv-list">
+      {% for conv in conversations %}
+      <div class="conv-item {% if conv.id == active_id %}active{% endif %}">
+        <a href="/chat?c={{ conv.id }}" title="{{ conv.title }}">{{ conv.title }}</a>
+        <button class="conv-del" hx-post="/api/chat/{{ conv.id }}/delete"
+                hx-confirm="Delete this conversation?" title="delete">✕</button>
+      </div>
+      {% else %}
+      <p class="muted" style="padding:.5rem">No conversations yet.</p>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <div class="chat-main">
+    <h1>Ask Holmes</h1>
+    <p class="muted">Follow-ups remember context. Commands work too:
+      <code>restart pod NAME in NS</code> · <code>scale DEPLOY in NS to N</code> ·
+      <code>rollback DEPLOY in NS</code> · <code>describe pod NAME in NS</code> —
+      mutations always show an approval button first.</p>
+
+    <div id="chat-log">
+      {% for m in messages %}{{ m.html|safe }}{% endfor %}
+    </div>
+
+    <form hx-post="/api/chat" hx-target="#chat-log" hx-swap="beforeend"
+          hx-indicator="#chat-spinner"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      <input type="hidden" name="conversation_id" id="conv-id" value="{{ active_id }}">
+      <input type="text" name="ask" placeholder="e.g. why is my pod crashing in namespace demo-lab?" required autofocus>
+      <button type="submit">Ask</button>
+      <span id="chat-spinner" class="htmx-indicator">investigating…</span>
+    </form>
+  </div>
+
+</div>
+<script>
+  // keep newest exchange in view
+  document.body.addEventListener('htmx:afterSwap', e => {
+    if (e.target.id === 'chat-log') e.target.lastElementChild?.scrollIntoView({behavior:'smooth'});
+  });
+</script>
 {% endblock %}
