@@ -1,0 +1,263 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ⛑ incidentpilot
+    - navigation [ref=e4]:
+      - link "Overview" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - link "Incidents" [ref=e6] [cursor=pointer]:
+        - /url: /incidents
+      - link "Ask Holmes" [ref=e7] [cursor=pointer]:
+        - /url: /chat
+      - link "Settings" [ref=e8] [cursor=pointer]:
+        - /url: /settings
+    - generic [ref=e9]: "cluster: incidentpilot-dev"
+  - main [ref=e10]:
+    - generic [ref=e11]:
+      - complementary [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: Conversations
+          - link "＋ New" [ref=e15] [cursor=pointer]:
+            - /url: /chat?c=new
+        - generic [ref=e16]:
+          - link "how many pods are creshed 2026-09-02" [ref=e18] [cursor=pointer]:
+            - /url: /chat?c=2
+            - generic [ref=e19]: how many pods are creshed
+            - generic [ref=e20]: 2026-09-02
+          - link "describe pod cart-8687cb99dd-9cwlp in demo-lab 2026-09-02" [ref=e22] [cursor=pointer]:
+            - /url: /chat?c=1
+            - generic [ref=e23]: describe pod cart-8687cb99dd-9cwlp in demo-lab
+            - generic [ref=e24]: 2026-09-02
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - heading "Ask Holmes" [level=1] [ref=e27]
+          - generic [ref=e28]: AI investigator with live access to kubectl, Prometheus & Loki
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - generic [ref=e31]: "You: how many pods are creshed"
+            - generic [ref=e32]:
+              - paragraph [ref=e33]:
+                - strong [ref=e34]: Dashboard Summary
+                - text: 🔴
+                - strong [ref=e35]:
+                  - text: 2 pods are in
+                  - generic [ref=e36]: CrashLoopBackOff
+                - text: + 1 pod with
+                - code [ref=e37]:
+                  - generic [ref=e38]: Error
+                - text: status across the cluster.
+              - separator [ref=e39]
+              - heading "Pod Status Table" [level=3] [ref=e40]
+              - table [ref=e41]:
+                - rowgroup [ref=e42]:
+                  - row [ref=e43]:
+                    - columnheader "Namespace" [ref=e44]
+                    - columnheader "Pod" [ref=e45]
+                    - columnheader "Status" [ref=e46]
+                    - columnheader "Reason" [ref=e47]
+                    - columnheader "Action" [ref=e48]
+                - rowgroup [ref=e49]:
+                  - row [ref=e50]:
+                    - cell [ref=e51]:
+                      - code [ref=e52]: incidentpilot-demo
+                    - cell [ref=e53]:
+                      - code [ref=e54]: checkout-d5bcbd854-xhw8p
+                    - cell "CrashLoopBackOff" [ref=e55]
+                    - cell [ref=e57]:
+                      - text: DB password auth failure for
+                      - code [ref=e58]: checkout_svc
+                    - cell [ref=e59]:
+                      - text: Restart pod, rotate DB credentials, check
+                      - code [ref=e60]: orders
+                      - text: DB connectivity
+                  - row [ref=e61]:
+                    - cell [ref=e62]:
+                      - code [ref=e63]: job-finder
+                    - cell [ref=e64]:
+                      - code [ref=e65]: backend-5685b85d86-hdvp7
+                    - cell "CrashLoopBackOff" [ref=e66]
+                    - cell "No recent logs; container may not write to stdout" [ref=e68]
+                    - cell [ref=e69]:
+                      - code [ref=e70]: kubectl describe pod
+                      - text: ", inspect restart count, check image/entrypoint"
+                  - row [ref=e71]:
+                    - cell [ref=e72]:
+                      - code [ref=e73]: trading
+                    - cell [ref=e74]:
+                      - code [ref=e75]: backend-8454c9b8bd-g788b
+                    - cell "Error" [ref=e76]
+                    - cell "Process exit / runtime error" [ref=e78]
+                    - cell [ref=e79]:
+                      - code [ref=e80]: kubectl describe pod --events
+                      - text: ", review logs, restart pod"
+              - separator [ref=e81]
+              - heading "Troubleshooting Steps" [level=3] [ref=e82]
+              - list [ref=e83]:
+                - listitem [ref=e84]:
+                  - strong [ref=e85]:
+                    - code [ref=e86]: checkout-d5bcbd854-xhw8p
+                - listitem [ref=e87]:
+                  - text: Logs show
+                  - code [ref=e88]: "FATAL: connection to database \"orders\" failed: password authentication failed for user \"checkout_svc\""
+                  - text: .
+                - listitem [ref=e89]:
+                  - paragraph [ref=e90]:
+                    - text: Verify the DB secret/password, restart the pod, and ensure the
+                    - code [ref=e91]: checkout_svc
+                    - text: user exists in the orders database.
+                - listitem [ref=e92]:
+                  - paragraph [ref=e93]:
+                    - strong [ref=e94]:
+                      - code [ref=e95]: backend-5685b85d86-hdvp7
+                - listitem [ref=e96]: No logs found in the last 7 days; pod may be stuck in a crash loop without stdout output.
+                - listitem [ref=e97]:
+                  - text: Run
+                  - code [ref=e98]: kubectl describe pod backend-5685b85d86-hdvp7 -n job-finder
+                  - text: to see events, restart count, and container state.
+                - listitem [ref=e99]:
+                  - paragraph [ref=e100]: Consider checking the container image, entrypoint, and any ConfigMap/Secret mounts.
+                - listitem [ref=e101]:
+                  - paragraph [ref=e102]:
+                    - strong [ref=e103]:
+                      - code [ref=e104]: backend-8454c9b8bd-g788b
+                - listitem [ref=e105]:
+                  - text: Status
+                  - code [ref=e106]:
+                    - generic [ref=e107]: Error
+                  - text: with 240 restarts in 6 minutes.
+                - listitem [ref=e108]:
+                  - text: Fetch logs (
+                  - code [ref=e109]: kubectl logs backend-8454c9b8bd-g788b -n trading
+                  - text: ) and describe the pod for events.
+                - listitem [ref=e110]: Restart the pod after identifying the root cause.
+              - separator [ref=e111]
+              - heading "Quick Commands" [level=3] [ref=e112]
+              - code [ref=e114]: "# View pod details & events kubectl describe pod checkout-d5bcbd854-xhw8p -n incidentpilot-dev kubectl describe pod backend-5685b85d86-hdvp7 -n job-finder kubectl describe pod backend-8454c9b8bd-g788b -n trading # Restart a pod (if safe) kubectl rollout restart deployment checkout -n incidentpilot-dev kubectl rollout restart deployment backend -n job-finder kubectl rollout restart deployment backend -n trading"
+          - generic [ref=e115]:
+            - generic [ref=e116]: "You: ?now tell me that how to fix this"
+            - generic [ref=e117]:
+              - paragraph [ref=e118]:
+                - strong [ref=e119]:
+                  - text: Fix Guide –
+                  - generic [ref=e120]: CrashLoopBackOff
+                  - text: /
+                  - generic [ref=e121]: Error
+                  - text: Pods
+                - text: 🔧
+                - strong [ref=e122]:
+                  - text: Resolve 2
+                  - generic [ref=e123]: CrashLoopBackOff
+                  - text: pods and 1
+                  - generic [ref=e124]: Error
+                  - text: pod by rotating credentials, checking images, and restarting deployments.
+              - separator [ref=e125]
+              - heading "Pod Overview" [level=3] [ref=e126]
+              - table [ref=e127]:
+                - rowgroup [ref=e128]:
+                  - row [ref=e129]:
+                    - columnheader "Namespace" [ref=e130]
+                    - columnheader "Pod" [ref=e131]
+                    - columnheader "Status" [ref=e132]
+                    - columnheader "Reason" [ref=e133]
+                    - columnheader "Action" [ref=e134]
+                - rowgroup [ref=e135]:
+                  - row [ref=e136]:
+                    - cell [ref=e137]:
+                      - code [ref=e138]: incidentpilot-demo
+                    - cell [ref=e139]:
+                      - code [ref=e140]: checkout-d5bcbd854-xhw8p
+                    - cell "CrashLoopBackOff" [ref=e141]
+                    - cell [ref=e143]:
+                      - text: DB password auth failure for
+                      - code [ref=e144]: checkout_svc
+                    - cell [ref=e145]:
+                      - text: Rotate DB credentials, ensure
+                      - code [ref=e146]: checkout_svc
+                      - text: user exists in
+                      - code [ref=e147]: orders
+                      - text: DB, then restart pod
+                  - row [ref=e148]:
+                    - cell [ref=e149]:
+                      - code [ref=e150]: job-finder
+                    - cell [ref=e151]:
+                      - code [ref=e152]: backend-5685b85d86-hdvp7
+                    - cell "CrashLoopBackOff" [ref=e153]
+                    - cell "No logs; container may not emit stdout" [ref=e155]
+                    - cell [ref=e156]:
+                      - text: Inspect events & restart count (
+                      - code [ref=e157]: kubectl describe pod
+                      - text: ), verify image/entrypoint, restart pod
+                  - row [ref=e158]:
+                    - cell [ref=e159]:
+                      - code [ref=e160]: trading
+                    - cell [ref=e161]:
+                      - code [ref=e162]: backend-8454c9b8bd-g788b
+                    - cell "Error" [ref=e163]
+                    - cell "Process exit / runtime error (240 restarts in 6 min)" [ref=e165]
+                    - cell [ref=e166]:
+                      - text: Fetch logs (
+                      - code [ref=e167]: kubectl logs
+                      - text: ), check container exit cause, restart deployment
+              - separator [ref=e168]
+              - heading "Fix Steps" [level=3] [ref=e169]
+              - paragraph [ref=e170]:
+                - strong [ref=e171]:
+                  - code [ref=e172]: checkout-d5bcbd854-xhw8p
+                - text: "-"
+                - strong [ref=e173]: Rotate / verify the DB password
+                - text: stored in the cluster secret that
+                - code [ref=e174]: checkout_svc
+                - text: uses to connect to the
+                - code [ref=e175]: orders
+                - text: database. -
+                - strong [ref=e176]:
+                  - text: Create the
+                  - code [ref=e177]: checkout_svc
+                  - text: user
+                - text: (if missing) in the
+                - code [ref=e178]: orders
+                - text: database and grant it access. -
+                - strong [ref=e179]: Restart the pod
+                - text: "to pick up the new credentials:"
+                - code [ref=e180]: bash kubectl rollout restart deployment checkout -n incidentpilot-dev
+              - paragraph [ref=e181]:
+                - strong [ref=e182]:
+                  - code [ref=e183]: backend-5685b85d86-hdvp7
+                - text: "-"
+                - strong [ref=e184]: Describe the pod
+                - text: "to see events, image pull errors, or entrypoint issues:"
+                - code [ref=e185]: bash kubectl describe pod backend-5685b85d86-hdvp7 -n job-finder
+                - text: "-"
+                - strong [ref=e186]: Check the container image
+                - text: and ensure it’s available and correctly tagged. -
+                - strong [ref=e187]: Verify the container’s command/entrypoint
+                - text: writes to stdout/stderr; if not, adjust the Dockerfile or Helm values. -
+                - strong [ref=e188]: Restart the pod
+                - text: "after corrections:"
+                - code [ref=e189]: bash kubectl rollout restart deployment backend -n job-finder
+              - paragraph [ref=e190]:
+                - strong [ref=e191]:
+                  - code [ref=e192]: backend-8454c9b8bd-g788b
+                - text: "-"
+                - strong [ref=e193]: Pull recent logs
+                - text: "to identify the crashing process:"
+                - code [ref=e194]: bash kubectl logs backend-8454c9b8bd-g788b -n trading
+                - text: "-"
+                - strong [ref=e195]: Examine pod events
+                - text: "for underlying reasons (OOM, health check failure, etc.):"
+                - code [ref=e196]: bash kubectl describe pod backend-8454c9b8bd-g788b -n trading
+                - text: "-"
+                - strong [ref=e197]: Fix the root cause
+                - text: (e.g., missing config, environment variable, resource limit). -
+                - strong [ref=e198]: Restart the deployment
+                - text: ":"
+                - code [ref=e199]: bash kubectl rollout restart deployment backend -n trading
+              - separator [ref=e200]
+              - heading "Quick Commands Summary" [level=3] [ref=e201]
+              - code [ref=e203]: "# 1. Rotate DB creds & restart checkout kubectl rollout restart deployment checkout -n incidentpilot-dev # 2. Inspect & restart job-finder backend kubectl describe pod backend-5685b85d86-hdvp7 -n job-finder kubectl rollout restart deployment backend -n job-finder # 3. Get logs & restart trading backend kubectl logs backend-8454c9b8bd-g788b -n trading kubectl describe pod backend-8454c9b8bd-g788b -n trading kubectl rollout restart deployment backend -n trading"
+        - generic [ref=e204]:
+          - generic [ref=e205]:
+            - 'textbox "Ask a question, or type a command like: restart pod NAME in NAMESPACE" [active] [ref=e206]'
+            - button "Ask" [ref=e207] [cursor=pointer]
+          - group [ref=e208]:
+            - generic "Operational commands" [ref=e209] [cursor=pointer]
+            - text: · · · · — mutations always ask for approval first.

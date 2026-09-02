@@ -4,46 +4,80 @@
 <div class="chat-layout">
 
   <aside class="chat-sidebar">
-    <a class="btn-link new-chat" href="/chat?c=new">＋ New chat</a>
+    <div class="sidebar-head">
+      <span>Conversations</span>
+      <a class="new-chat" href="/chat?c=new" title="Start a new conversation">＋ New</a>
+    </div>
     <div class="conv-list">
       {% for conv in conversations %}
       <div class="conv-item {% if conv.id == active_id %}active{% endif %}">
-        <a href="/chat?c={{ conv.id }}" title="{{ conv.title }}">{{ conv.title }}</a>
+        <a href="/chat?c={{ conv.id }}" title="{{ conv.title }}">
+          <span class="conv-title">{{ conv.title }}</span>
+          <span class="conv-date">{{ conv.created_at[:10] }}</span>
+        </a>
         <button class="conv-del" hx-post="/api/chat/{{ conv.id }}/delete"
                 hx-confirm="Delete this conversation?" title="delete">✕</button>
       </div>
       {% else %}
-      <p class="muted" style="padding:.5rem">No conversations yet.</p>
+      <p class="muted conv-empty">No conversations yet.<br>Ask something below to start one.</p>
       {% endfor %}
     </div>
   </aside>
 
   <div class="chat-main">
-    <h1>Ask Holmes</h1>
-    <p class="muted">Follow-ups remember context. Commands work too:
-      <code>restart pod NAME in NS</code> · <code>scale DEPLOY in NS to N</code> ·
-      <code>rollback DEPLOY in NS</code> · <code>describe pod NAME in NS</code> —
-      mutations always show an approval button first.</p>
+    <div class="chat-head">
+      <h1>Ask Holmes</h1>
+      <span class="muted">AI investigator with live access to kubectl, Prometheus &amp; Loki</span>
+    </div>
 
     <div id="chat-log">
+      {% if not messages %}
+      <div class="chat-welcome">
+        <div class="welcome-icon">🔎</div>
+        <p>Ask anything about your cluster — Holmes investigates with real tools and remembers follow-ups.</p>
+        <div class="suggestions">
+          <button type="button" onclick="fillAsk(this)">Which pods are unhealthy right now?</button>
+          <button type="button" onclick="fillAsk(this)">Why is my pod crashing in namespace demo-lab?</button>
+          <button type="button" onclick="fillAsk(this)">Summarize the logs of the last failed pod</button>
+        </div>
+      </div>
+      {% endif %}
       {% for m in messages %}{{ m.html|safe }}{% endfor %}
     </div>
 
-    <form hx-post="/api/chat" hx-target="#chat-log" hx-swap="beforeend"
-          hx-indicator="#chat-spinner"
-          hx-on::after-request="if(event.detail.successful) this.reset()">
-      <input type="hidden" name="conversation_id" id="conv-id" value="{{ active_id }}">
-      <input type="text" name="ask" placeholder="e.g. why is my pod crashing in namespace demo-lab?" required autofocus>
-      <button type="submit">Ask</button>
-      <span id="chat-spinner" class="htmx-indicator">investigating…</span>
-    </form>
+    <div class="chat-input-area">
+      <form hx-post="/api/chat" hx-target="#chat-log" hx-swap="beforeend"
+            hx-indicator="#chat-spinner"
+            hx-on::after-request="if(event.detail.successful) this.reset()">
+        <input type="hidden" name="conversation_id" id="conv-id" value="{{ active_id }}">
+        <input type="text" name="ask" id="ask-input" autocomplete="off"
+               placeholder="Ask a question, or type a command like: restart pod NAME in NAMESPACE" required autofocus>
+        <button type="submit">Ask</button>
+        <span id="chat-spinner" class="htmx-indicator">investigating…</span>
+      </form>
+      <details class="cmd-help">
+        <summary>Operational commands</summary>
+        <code>restart pod NAME in NS</code> · <code>restart deployment NAME in NS</code> ·
+        <code>scale DEPLOY in NS to N</code> · <code>rollback DEPLOY in NS</code> ·
+        <code>describe pod NAME in NS</code> — mutations always ask for approval first.
+      </details>
+    </div>
   </div>
 
 </div>
 <script>
-  // keep newest exchange in view
+  function fillAsk(btn) {
+    const input = document.getElementById('ask-input');
+    input.value = btn.textContent;
+    input.focus();
+  }
+  const log = document.getElementById('chat-log');
+  log.scrollTop = log.scrollHeight;   // open at the newest message
   document.body.addEventListener('htmx:afterSwap', e => {
-    if (e.target.id === 'chat-log') e.target.lastElementChild?.scrollIntoView({behavior:'smooth'});
+    if (e.target.id === 'chat-log') {
+      document.querySelector('.chat-welcome')?.remove();
+      log.scrollTop = log.scrollHeight;
+    }
   });
 </script>
 {% endblock %}
