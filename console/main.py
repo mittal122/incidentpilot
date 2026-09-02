@@ -430,7 +430,7 @@ def investigate(incident_id: str):
     try:
         analysis, _ = ask_holmes(question)
     except Exception as e:
-        return HTMLResponse(f'<pre class="action-err">Holmes error: {e}</pre>')
+        return HTMLResponse(f'<pre class="action-err">AI engine error: {e}</pre>')
     with db() as conn:
         conn.execute(
             "UPDATE incidents SET investigation = ? WHERE id = ?",
@@ -486,7 +486,7 @@ def chat(ask: str = Form(...), conversation_id: int = Form(0)):
             analysis, history = ask_holmes(ask + MD_STYLE_HINT, history=history)
             body = render_ai(analysis)
         except Exception as e:
-            body = f'<div class="action-err">Holmes error: {escape(str(e))}</div>'
+            body = f'<div class="action-err">AI engine error: {escape(str(e))}</div>'
     entry = f'<div class="chat-entry"><div class="q">You: {escape(ask)}</div>{body}</div>'
     with db() as conn:
         conn.execute(
@@ -884,7 +884,7 @@ def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
     try:
         analysis, _ = ask_holmes(question)
     except Exception as e:
-        return HTMLResponse(f'<div class="action-err">Holmes error: {escape(str(e))}</div>')
+        return HTMLResponse(f'<div class="action-err">AI engine error: {escape(str(e))}</div>')
     return HTMLResponse(render_ai(analysis))
 
 
@@ -976,7 +976,7 @@ def slack_save(slack_channel: str = Form(""), slack_token: str = Form("")):
         save_runner_config(cfg)
     except Exception as e:
         return HTMLResponse(f'<div class="action-err">✗ {escape(str(e))}</div>')
-    return HTMLResponse('<div class="action-ok">✓ saved — Robusta runner restarting (~30s)</div>')
+    return HTMLResponse('<div class="action-ok">✓ saved — alert pipeline restarting (~30s)</div>')
 
 
 @app.post("/settings/slack/test", response_class=HTMLResponse)
@@ -1013,7 +1013,7 @@ def webhook_save(webhook_url: str = Form(...)):
         save_runner_config(cfg)
     except Exception as e:
         return HTMLResponse(f'<div class="action-err">✗ {escape(str(e))}</div>')
-    return HTMLResponse('<div class="action-ok">✓ saved — Robusta runner restarting (~30s)</div>')
+    return HTMLResponse('<div class="action-ok">✓ saved — alert pipeline restarting (~30s)</div>')
 
 
 # ── settings page ────────────────────────────────────────────────────
@@ -1131,7 +1131,7 @@ def settings_activate(request: Request, pid: str):
         conn.execute("UPDATE providers SET active = 0")
         conn.execute("UPDATE providers SET active = 1 WHERE provider = ?", (pid,))
     return HTMLResponse(
-        '<div class="action-ok">✓ Activated — Holmes is restarting (~1 min). '
+        '<div class="action-ok">✓ Activated — AI engine restarting (~1 min). '
         'If running locally, re-run ./run.sh to refresh the port-forward.</div>'
     )
 

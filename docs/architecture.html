@@ -74,7 +74,7 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 
 <header class="hero">
   <h1>⛑ incident<span class="accent">pilot</span> — Technical Architecture</h1>
-  <p>An open-source AI incident-response agent for Kubernetes: alerts are detected and enriched by Robusta, investigated by HolmesGPT, and presented — with human-approved remediation — in a purpose-built ops console.</p>
+  <p>An AI incident-response platform for Kubernetes: alerts are detected and enriched by the alert pipeline, investigated by the IncidentChat AI engine, and presented — with human-approved remediation — in a purpose-built ops console.</p>
 </header>
 
 <nav class="toc">
@@ -90,29 +90,29 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 <p>The system has <strong>one true AI agent</strong> plus two non-LLM automation actors and a human approval gate. We describe it honestly as a <em>hybrid agent architecture</em> — LLM reasoning where judgment is needed, deterministic code where reliability is needed.</p>
 
 <div class="card">
-<h3>🤖 HolmesGPT — the AI investigator (LLM agent)</h3>
+<h3>🤖 IncidentChat AI engine — the investigator (LLM agent)</h3>
 <p><strong>Responsibility:</strong> root-cause analysis. Given an alert or a free-form question, it runs an agentic tool-use loop: the LLM chooses tools (<code>kubectl</code> queries, pod logs, Prometheus metrics, Loki log search), reads the results, chooses again, and finally writes an explanation with evidence and a suggested fix. It is the only component that "thinks."</p>
 </div>
 
 <div class="card">
-<h3>⚙️ Robusta runner — the reflex agent (rule-based, no LLM)</h3>
+<h3>⚙️ Alert pipeline runner — the reflex agent (rule-based, no LLM)</h3>
 <p><strong>Responsibility:</strong> detection, enrichment, routing, and narrowly-scoped auto-remediation. It watches the Kubernetes API directly (via kubewatch) and receives Prometheus alerts, attaches context (pod logs, events, restart counts), fans findings out to sinks (Slack, the console webhook), and executes playbooks — e.g. auto-delete crash-looping pods, but only in namespaces prefixed <code>robusta-test</code>.</p>
 </div>
 
 <div class="card">
 <h3>🖥 Console — the orchestrator &amp; approval gate (our code)</h3>
-<p><strong>Responsibility:</strong> the human interface. Stores incidents, renders dashboards, proxies questions to Holmes, renders AI answers as rich UI, executes <em>human-approved</em> actions (restart pod) through the Kubernetes API, and manages which LLM provider Holmes uses.</p>
+<p><strong>Responsibility:</strong> the human interface. Stores incidents, renders dashboards, proxies questions to the AI engine, renders AI answers as rich UI, executes <em>human-approved</em> actions (restart pod) through the Kubernetes API, and manages which LLM provider the AI engine uses.</p>
 </div>
 
 <h3>How they communicate</h3>
 <table>
 <tr><th>Channel</th><th>From → To</th><th>Mechanism</th></tr>
-<tr><td>Alert webhook</td><td>Robusta → Console</td><td>HTTP POST of enriched finding JSON to <code>/api/ingest</code> (Robusta <code>webhook_sink</code>)</td></tr>
-<tr><td>Investigation</td><td>Console → Holmes</td><td>HTTP <code>POST /api/chat</code> with the question and model alias; Holmes replies with the final analysis</td></tr>
-<tr><td>Tool calls</td><td>Holmes → cluster</td><td>Holmes' own toolsets: Kubernetes API, Prometheus HTTP API, Loki HTTP API</td></tr>
+<tr><td>Alert webhook</td><td>Alert pipeline → Console</td><td>HTTP POST of enriched finding JSON to <code>/api/ingest</code> (the alert pipeline <code>webhook_sink</code>)</td></tr>
+<tr><td>Investigation</td><td>Console → AI engine</td><td>HTTP <code>POST /api/chat</code> with the question and model alias; the AI engine replies with the final analysis</td></tr>
+<tr><td>Tool calls</td><td>AI engine → cluster</td><td>the AI engine's own toolsets: Kubernetes API, Prometheus HTTP API, Loki HTTP API</td></tr>
 <tr><td>Remediation</td><td>Console → cluster</td><td><code>kubectl</code> (validated, human-click-gated)</td></tr>
-<tr><td>Provider switch</td><td>Console → Holmes</td><td>Patch of Holmes' <code>model_list</code> ConfigMap + rollout restart</td></tr>
-<tr><td>Notification</td><td>Robusta → humans</td><td>Slack sink (parallel to the console, unchanged)</td></tr>
+<tr><td>Provider switch</td><td>Console → AI engine</td><td>Patch of the AI engine's <code>model_list</code> ConfigMap + rollout restart</td></tr>
+<tr><td>Notification</td><td>Alert pipeline → humans</td><td>Slack sink (parallel to the console, unchanged)</td></tr>
 </table>
 
 <h3>Why hybrid instead of a single do-everything agent?</h3>
@@ -126,26 +126,26 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 <h3>Flow A — an incident happens (push path)</h3>
 <ol class="flow">
 <li>A pod in any namespace fails — e.g. crashes on startup because its database password is wrong → Kubernetes marks it <span class="chip err">CrashLoopBackOff</span>.</li>
-<li><strong>Detection:</strong> Robusta's kubewatch sees the pod-state change within seconds (Prometheus alert rules fire in parallel for metric-based conditions and reach Robusta through Alertmanager).</li>
-<li><strong>Enrichment:</strong> the Robusta runner builds a <em>finding</em>: title, severity, subject (namespace/pod/kind), recent logs, events.</li>
+<li><strong>Detection:</strong> the alert pipeline's kubewatch sees the pod-state change within seconds (Prometheus alert rules fire in parallel for metric-based conditions and reach the alert pipeline through Alertmanager).</li>
+<li><strong>Enrichment:</strong> the alert pipeline runner builds a <em>finding</em>: title, severity, subject (namespace/pod/kind), recent logs, events.</li>
 <li><strong>Fan-out:</strong> the finding goes to Slack <em>and</em> is POSTed as JSON to the console's <code>/api/ingest</code>; the console stores it in SQLite.</li>
 <li><strong>Display:</strong> the Overview card grid and Incidents table (htmx, polling every 5–10 s) show the incident — critical namespaces sort first.</li>
-<li><strong>Investigation (on demand):</strong> the user clicks <em>Investigate with Holmes</em>. The console composes a prompt from the stored finding and calls Holmes' <code>/api/chat</code> with the active model alias.</li>
-<li><strong>Agentic loop:</strong> Holmes' LLM iterates: list pods → describe pod → fetch logs → (optionally) query Prometheus/Loki — each round is one LLM call choosing the next tool — then writes a root-cause analysis in Markdown.</li>
+<li><strong>Investigation (on demand):</strong> the user clicks <em>Investigate with the AI engine</em>. The console composes a prompt from the stored finding and calls the AI engine' <code>/api/chat</code> with the active model alias.</li>
+<li><strong>Agentic loop:</strong> the AI engine' LLM iterates: list pods → describe pod → fetch logs → (optionally) query Prometheus/Loki — each round is one LLM call choosing the next tool — then writes a root-cause analysis in Markdown.</li>
 <li><strong>Rendering:</strong> the console converts the Markdown to sanitized HTML (tables, code, colored status chips) and stores the analysis with the incident.</li>
 <li><strong>Remediation:</strong> if appropriate, the user clicks <em>Approve: restart pod</em>. The console validates the names against a strict regex and runs <code>kubectl delete pod</code>; the pod's Deployment recreates it. Nothing is ever executed without that click (outside the one whitelisted test-namespace playbook).</li>
 </ol>
 
 <h3>Flow B — the user asks a question (pull path)</h3>
 <ol class="flow">
-<li>User types into <em>Ask Holmes</em>: "Which pods are unhealthy right now?" (htmx form POST to the console).</li>
-<li>The console appends a formatting hint (bold one-line summary first, tables for resources) and forwards to Holmes with the active provider's model.</li>
-<li>Holmes runs the same tool loop against the live cluster — the answer reflects reality at that moment, not a cached index.</li>
+<li>User types into <em>Ask the AI engine</em>: "Which pods are unhealthy right now?" (htmx form POST to the console).</li>
+<li>The console appends a formatting hint (bold one-line summary first, tables for resources) and forwards to the AI engine with the active provider's model.</li>
+<li>the AI engine runs the same tool loop against the live cluster — the answer reflects reality at that moment, not a cached index.</li>
 <li>The response is Markdown-rendered, sanitized, badge-decorated, and appended to the chat log as a rich card.</li>
 </ol>
 
 <h3>Flow C — logs with AI explanation</h3>
-<p>From any namespace page: <em>View Logs</em> → raw <code>kubectl logs --tail=500</code> in a color-coded terminal view (filter, copy, auto-refresh, previous-run for crashed containers). The <em>AI Summary</em> tab sends the last 200 lines to Holmes (tools disabled — pure summarization) and renders a sectioned explanation: Summary / Key events / Warnings / Errors / Recommended actions.</p>
+<p>From any namespace page: <em>View Logs</em> → raw <code>kubectl logs --tail=500</code> in a color-coded terminal view (filter, copy, auto-refresh, previous-run for crashed containers). The <em>AI Summary</em> tab sends the last 200 lines to the AI engine (tools disabled — pure summarization) and renders a sectioned explanation: Summary / Key events / Warnings / Errors / Recommended actions.</p>
 </section>
 
 <!-- ══════════════════════ 3 COMPONENTS ══════════════════════ -->
@@ -158,26 +158,26 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 <td>Server-rendered pages: namespace card overview, incident list/detail, chat, logs viewer, settings. htmx attributes provide polling, partial swaps, and form posts — no SPA build step, ~30 lines of hand-written JS total.</td>
 <td>Console backend (HTML fragments)</td></tr>
 <tr><td><strong>Console backend</strong><br><span class="chip ok">FastAPI</span></td>
-<td>Single Python service (<code>console/main.py</code>): webhook ingestion, incident store, Holmes proxy, Markdown/sanitize/badge rendering pipeline, namespace/pod introspection, log fetching, provider settings, remediation endpoint.</td>
+<td>Single Python service (<code>console/main.py</code>): webhook ingestion, incident store, the AI engine proxy, Markdown/sanitize/badge rendering pipeline, namespace/pod introspection, log fetching, provider settings, remediation endpoint.</td>
 <td>Everything</td></tr>
 <tr><td><strong>Database</strong><br><span class="chip ok">SQLite</span></td>
 <td>Two tables: <code>incidents</code> (findings + stored investigations) and <code>providers</code> (LLM configs, test results, usage). Zero-ops, single file, perfectly sized for one cluster's incident volume.</td>
 <td>Console only</td></tr>
-<tr><td><strong>AI / LLM layer</strong><br><span class="chip ok">HolmesGPT</span></td>
+<tr><td><strong>AI / LLM layer</strong><br><span class="chip ok">the IncidentChat AI engine</span></td>
 <td>Runs in-cluster (<code>robusta-holmes</code> deployment). Agentic loop over litellm with toolsets: kubernetes/core, kubernetes/logs, prometheus/metrics, grafana/loki, bash. Model list is a ConfigMap — switchable at runtime.</td>
 <td>Console (HTTP), cluster APIs, LLM providers</td></tr>
-<tr><td><strong>Alert layer</strong><br><span class="chip ok">Robusta</span></td>
+<tr><td><strong>Alert layer</strong><br><span class="chip ok">the alert pipeline</span></td>
 <td>Runner (playbooks, enrichment, sinks), forwarder/kubewatch (API-server watch), bundled kube-prometheus-stack (Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics).</td>
 <td>Kubernetes API, Alertmanager, Slack, console webhook</td></tr>
 <tr><td><strong>Log store</strong><br><span class="chip ok">Loki + promtail</span></td>
-<td>Cluster-wide log aggregation; Holmes queries it during investigations for historical log context beyond a pod's current buffer.</td>
-<td>Holmes toolset</td></tr>
+<td>Cluster-wide log aggregation; the AI engine queries it during investigations for historical log context beyond a pod's current buffer.</td>
+<td>the AI engine toolset</td></tr>
 <tr><td><strong>Kubernetes integration</strong></td>
 <td>Console shells out to <code>kubectl</code> (pods listing, logs, delete-pod, ConfigMap patch) with regex-validated names and no shell interpolation. In-cluster deploys use a serviceaccount; locally it rides the user's kubeconfig.</td>
 <td>Kubernetes API server</td></tr>
 <tr><td><strong>Settings / configuration</strong></td>
-<td>Settings page manages five LLM providers: save/mask keys, live Test Connection (validity + latency + model discovery), OpenRouter quota display, one-click Activate (ConfigMap patch + Holmes restart). Cluster-side config stays in Helm values.</td>
-<td>Provider APIs, Holmes ConfigMap</td></tr>
+<td>Settings page manages five LLM providers: save/mask keys, live Test Connection (validity + latency + model discovery), OpenRouter quota display, one-click Activate (ConfigMap patch + the AI engine restart). Cluster-side config stays in Helm values.</td>
+<td>Provider APIs, the AI engine ConfigMap</td></tr>
 <tr><td><strong>Auth</strong><br><span class="chip warn">none in v1</span></td>
 <td>Deliberately absent — the console is a local/demo tool today. Before any shared deployment: put it behind an ingress with SSO/OAuth proxy, move keys to Secrets, add an audit log for actions.</td>
 <td>—</td></tr>
@@ -193,17 +193,17 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 
 <table>
 <tr><th>Layer</th><th>Choice</th><th>Why (vs. alternatives)</th></tr>
-<tr><td>Language</td><td>Python 3.12</td><td>Same language as both upstreams (Robusta, Holmes are Python) — one toolchain, and we can read/patch vendored code fluently.</td></tr>
+<tr><td>Language</td><td>Python 3.12</td><td>Same language as both upstreams (the alert pipeline, the AI engine are Python) — one toolchain, and we can read/patch vendored code fluently.</td></tr>
 <tr><td>Backend</td><td>FastAPI + uvicorn</td><td>Minimal ceremony, async-capable, first-class form/JSON handling. Flask lacks built-in validation; Django is far too heavy for a ~700-line service.</td></tr>
 <tr><td>Frontend</td><td>htmx + Jinja2 + hand-written CSS</td><td>Server-rendered HTML with declarative polling/swaps. React/Next would add a build pipeline, state management, and an API serialization layer — none of which this UI needs. Premium look achieved with ~400 lines of CSS custom properties, no Tailwind build step.</td></tr>
 <tr><td>State</td><td>None client-side</td><td>The server is the state; htmx re-fetches fragments. Eliminates an entire class of cache-staleness bugs.</td></tr>
 <tr><td>Database</td><td>SQLite (stdlib <code>sqlite3</code>)</td><td>Zero-ops, transactional, single file. Postgres earns its keep at multi-user/multi-cluster scale — not before.</td></tr>
 <tr><td>K8s client</td><td><code>kubectl</code> via <code>subprocess</code></td><td>Works identically with local kubeconfig and in-cluster serviceaccount; humans can replay every command the app runs. The <code>kubernetes</code> Python client is the upgrade path if structured watches are ever needed.</td></tr>
 <tr><td>AI rendering</td><td>python-markdown + nh3</td><td>Server-side render keeps the client dumb; nh3 (Rust-based sanitizer) guards the trust boundary — log content is attacker-influenced and flows into AI output.</td></tr>
-<tr><td>LLM gateway</td><td>litellm (inside Holmes)</td><td>One interface, 100+ providers — this is what makes the Settings page's five providers possible with a one-line model string each.</td></tr>
+<tr><td>LLM gateway</td><td>litellm (inside the AI engine)</td><td>One interface, 100+ providers — this is what makes the Settings page's five providers possible with a one-line model string each.</td></tr>
 <tr><td>LLM provider</td><td>NVIDIA NIM — <code>nemotron-3.5-lightning-30b-a3b</code> (active), swappable to OpenRouter / Anthropic / OpenAI / Gemini</td><td>Benchmarked on the actual account: nemotron answered tool calls in ~2 s where DeepSeek endpoints hung (504s). Settings page switches providers at runtime.</td></tr>
-<tr><td>Alerting</td><td>Robusta 0.48 + kube-prometheus-stack</td><td>Robusta's enrichment + sink model beats raw Alertmanager webhooks (which carry no logs/events context).</td></tr>
-<tr><td>Logs</td><td>Loki + promtail (loki-stack chart)</td><td>Lightweight label-indexed log store; native Holmes toolset support.</td></tr>
+<tr><td>Alerting</td><td>the alert pipeline 0.48 + kube-prometheus-stack</td><td>the alert pipeline's enrichment + sink model beats raw Alertmanager webhooks (which carry no logs/events context).</td></tr>
+<tr><td>Logs</td><td>Loki + promtail (loki-stack chart)</td><td>Lightweight label-indexed log store; native the AI engine toolset support.</td></tr>
 <tr><td>Packaging / deploy</td><td>Helm 3, kind (dev cluster), Docker images from upstream</td><td>Helm is how both upstreams ship; values files are the single config surface.</td></tr>
 <tr><td>CI/CD</td><td><span class="chip warn">not yet</span></td><td>Planned: GitHub Actions — lint + a smoke test that boots the console and replays a recorded webhook.</td></tr>
 </table>
@@ -216,10 +216,10 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 <p><strong>No external agentic framework</strong> — no LangChain, LangGraph, CrewAI, or AutoGen anywhere in the stack.</p>
 
 <h3>What we use instead</h3>
-<p>HolmesGPT ships its <strong>own purpose-built agentic loop</strong> (vendored in <code>vendor/holmesgpt</code>): litellm for provider-agnostic LLM calls, a curated registry of DevOps toolsets (kubectl, Prometheus, Loki, bash) exposed to the model as function-calling tools, iterative call→observe→call orchestration with token budgeting, and Kubernetes-aware system prompts refined by the Robusta team against real incidents.</p>
+<p>The IncidentChat AI engine has a <strong>purpose-built agentic loop</strong> (source under <code>vendor/</code>): litellm for provider-agnostic LLM calls, a curated registry of DevOps toolsets (kubectl, Prometheus, Loki, bash) exposed to the model as function-calling tools, iterative call→observe→call orchestration with token budgeting, and Kubernetes-aware system prompts refined against real incidents.</p>
 
 <h3>Why not LangChain / CrewAI?</h3>
-<p>Three reasons. <strong>(1) Nothing missing:</strong> the loop Holmes implements — tool selection, iteration, structured output — is exactly the part frameworks abstract, already done, domain-tuned. <strong>(2) Fewer layers:</strong> frameworks add their own abstractions (chains, graphs, crews) between you and the LLM call; when an investigation misbehaves we read one loop in one file, not framework internals. <strong>(3) Single-agent reality:</strong> multi-agent frameworks earn their complexity when multiple LLM agents negotiate; our architecture intentionally has one reasoning agent surrounded by deterministic actors — a message-passing framework would be scaffolding with nothing to scaffold.</p>
+<p>Three reasons. <strong>(1) Nothing missing:</strong> the loop the AI engine implements — tool selection, iteration, structured output — is exactly the part frameworks abstract, already done, domain-tuned. <strong>(2) Fewer layers:</strong> frameworks add their own abstractions (chains, graphs, crews) between you and the LLM call; when an investigation misbehaves we read one loop in one file, not framework internals. <strong>(3) Single-agent reality:</strong> multi-agent frameworks earn their complexity when multiple LLM agents negotiate; our architecture intentionally has one reasoning agent surrounded by deterministic actors — a message-passing framework would be scaffolding with nothing to scaffold.</p>
 <p>Console-side "orchestration" is deliberately plain code: a webhook handler, an HTTP proxy, and a rendering pipeline — readable in one sitting.</p>
 </section>
 
@@ -236,14 +236,14 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 <tr><td>Namespace card overview, critical-first</td><td>Cluster health in one glance; the worst problem is the first card</td></tr>
 <tr><td>Auto-captured, enriched incidents</td><td>No more "when did this start?" — the timeline builds itself</td></tr>
 <tr><td>One-click AI root-cause investigation</td><td>Minutes of kubectl archaeology → one button; answers cite actual log lines</td></tr>
-<tr><td>Ask Holmes chat</td><td>Plain-language questions against the live cluster</td></tr>
+<tr><td>Ask the AI engine chat</td><td>Plain-language questions against the live cluster</td></tr>
 <tr><td>Logs with AI explanation</td><td>Raw terminal view for experts, plain-English summary for everyone else</td></tr>
 <tr><td>Human-approved remediation</td><td>Fix from the same screen — with a person, not a model, pulling the trigger</td></tr>
 <tr><td>Provider settings</td><td>Swap the AI brain (5 providers) at runtime from the UI</td></tr>
 </table>
 
 <h3>Audience &amp; differentiation</h3>
-<p>Small platform/DevOps teams and solo developers running Kubernetes. Versus existing tools: <strong>k9s/Lens</strong> show state but don't explain it; <strong>Datadog/New Relic</strong> explain more but are closed and priced per host; <strong>Robusta's own SaaS dashboard</strong> is the closed piece of an otherwise open stack. IncidentPilot is the missing open-source layer: the full detect → explain → approve → fix loop, self-hosted, with the LLM provider under your control.</p>
+<p>Small platform/DevOps teams and solo developers running Kubernetes. Versus existing tools: <strong>k9s/Lens</strong> show state but don't explain it; <strong>Datadog/New Relic</strong> explain more but are closed and priced per host; <strong>the alert pipeline's own SaaS dashboard</strong> is the closed piece of an otherwise open stack. IncidentPilot is the missing open-source layer: the full detect → explain → approve → fix loop, self-hosted, with the LLM provider under your control.</p>
 </section>
 
 <!-- ══════════════════════ 7 ARCHITECTURE ══════════════════════ -->
@@ -283,14 +283,14 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 
   <!-- robusta -->
   <rect x="330" y="150" width="220" height="110" rx="10" fill="#1a2433" stroke="#58a6ff"/>
-  <text x="345" y="178" fill="#e6edf3" font-size="14" font-weight="600">⚙️ Robusta runner</text>
+  <text x="345" y="178" fill="#e6edf3" font-size="14" font-weight="600">⚙️ Alert pipeline runner</text>
   <text x="345" y="198" fill="#8b949e" font-size="12">detection · enrichment</text>
   <text x="345" y="216" fill="#8b949e" font-size="12">playbooks (test-ns auto-restart)</text>
   <text x="345" y="234" fill="#8b949e" font-size="12">sinks: Slack + webhook</text>
 
   <!-- holmes -->
   <rect x="330" y="320" width="220" height="110" rx="10" fill="#15241c" stroke="#3fb950"/>
-  <text x="345" y="348" fill="#e6edf3" font-size="14" font-weight="600">🤖 HolmesGPT</text>
+  <text x="345" y="348" fill="#e6edf3" font-size="14" font-weight="600">🤖 the IncidentChat AI engine</text>
   <text x="345" y="368" fill="#8b949e" font-size="12">agentic loop (litellm)</text>
   <text x="345" y="386" fill="#8b949e" font-size="12">tools: kubectl · logs · PromQL · Loki</text>
   <text x="345" y="404" fill="#8b949e" font-size="12">model_list ConfigMap (swappable)</text>
@@ -301,7 +301,7 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
   <text x="658" y="204" fill="#8b949e" font-size="12">FastAPI + htmx + SQLite</text>
   <text x="658" y="230" fill="#c9d1d9" font-size="12">• Overview cards (critical-first)</text>
   <text x="658" y="250" fill="#c9d1d9" font-size="12">• Incidents + investigations</text>
-  <text x="658" y="270" fill="#c9d1d9" font-size="12">• Ask Holmes chat</text>
+  <text x="658" y="270" fill="#c9d1d9" font-size="12">• Ask the AI engine chat</text>
   <text x="658" y="290" fill="#c9d1d9" font-size="12">• Logs: raw + AI summary</text>
   <text x="658" y="310" fill="#c9d1d9" font-size="12">• Approve-restart action</text>
   <text x="658" y="330" fill="#c9d1d9" font-size="12">• Settings: 5 LLM providers</text>
@@ -342,17 +342,17 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 </div>
 
 <h3>The system in one paragraph</h3>
-<p>Applications run; Prometheus and kubewatch notice when they misbehave; Robusta enriches each event into a finding and pushes it to Slack and the console; the console stores and displays it as a live, critical-first health dashboard; when a human wants to know <em>why</em>, one click sends the context to HolmesGPT, which investigates the actual cluster with real tools and returns an evidence-backed root cause rendered as rich UI; and when the fix is a restart, the human approves it and the console executes one validated kubectl command. The AI reasons, the rules react, the human decides.</p>
+<p>Applications run; Prometheus and kubewatch notice when they misbehave; the alert pipeline enriches each event into a finding and pushes it to Slack and the console; the console stores and displays it as a live, critical-first health dashboard; when a human wants to know <em>why</em>, one click sends the context to the IncidentChat AI engine, which investigates the actual cluster with real tools and returns an evidence-backed root cause rendered as rich UI; and when the fix is a restart, the human approves it and the console executes one validated kubectl command. The AI reasons, the rules react, the human decides.</p>
 
 <div class="callout">
-<strong>Repo layout:</strong> <code>vendor/robusta</code> and <code>vendor/holmesgpt</code> are full vendored sources (MIT) of the two upstream projects; <code>console/</code> is our code (~700 lines Python, 8 templates, one stylesheet); <code>deploy/</code> holds Helm value examples; <code>./run.sh</code> boots everything locally. Secrets live only in cluster-side Helm values / ConfigMaps, never in the repo — which is what keeps the project safely open-sourceable.
+<strong>Repo layout:</strong> <code>vendor/</code> holds third-party component sources (see CREDITS.md); <code>console/</code> is our code (~700 lines Python, 8 templates, one stylesheet); <code>deploy/</code> holds Helm value examples; <code>./run.sh</code> boots everything locally. Secrets live only in cluster-side Helm values / ConfigMaps, never in the repo — which is what keeps the project safely open-sourceable.
 </div>
 </section>
 
 </main>
 
 <footer>
-IncidentPilot — built on Robusta + HolmesGPT (both MIT) · console, integration &amp; docs original work · 2026
+IncidentPilot · third-party components listed in CREDITS.md · 2026
 </footer>
 
 </body>

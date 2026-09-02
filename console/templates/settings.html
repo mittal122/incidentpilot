@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>Settings — AI providers</h1>
-    <p class="muted">Configure the LLM behind HolmesGPT. Keys are stored in the console database and, for the active provider, in the Holmes ConfigMap (readable by cluster admins).</p>
+    <p class="muted">Configure the LLM behind the IncidentChat AI engine. Keys are stored in the console database and, for the active provider, in the AI engine config (readable by cluster admins).</p>
   </div>
 </div>
 <h2 class="settings-h">Application</h2>
@@ -12,10 +12,10 @@
   <form class="provider-form" hx-post="/settings/app/save" hx-target="#app-save-result" hx-swap="innerHTML">
     <label class="field"><span class="s-label">Cluster display name</span>
       <input type="text" name="cluster_name" value="{{ app_cfg.cluster_name }}"></label>
-    <label class="field"><span class="s-label">Holmes API URL</span>
+    <label class="field"><span class="s-label">AI engine URL</span>
       <input type="text" name="holmes_url" value="{{ app_cfg.holmes_url }}"
-             placeholder="http://localhost:10001 or http://robusta-holmes.default.svc:80"></label>
-    <label class="field"><span class="s-label">Default Holmes model alias</span>
+             placeholder="http://localhost:10001 (local) or in-cluster service URL"></label>
+    <label class="field"><span class="s-label">Default AI model alias</span>
       <input type="text" name="holmes_model" value="{{ app_cfg.holmes_model }}"></label>
     <button type="submit">Save</button>
   </form>
@@ -24,14 +24,14 @@
 
 <h2 class="settings-h">Integrations</h2>
 {% if not integrations.available %}
-<div class="provider-card"><div class="action-err">Cannot read Robusta config from the cluster: {{ integrations.error }}. Slack/webhook editing needs kubectl access to the robusta release.</div></div>
+<div class="provider-card"><div class="action-err">Cannot read the alert-pipeline config from the cluster: {{ integrations.error }}. Slack/webhook editing needs kubectl access to the cluster.</div></div>
 {% else %}
 <div class="provider-card">
   <div class="provider-head"><span class="status-dot ok"></span>
     <span class="provider-name">💬 Slack notifications</span>
-    <span class="muted endpoint">via Robusta slack sink</span></div>
+    <span class="muted endpoint">notification channel</span></div>
   <form class="provider-form" hx-post="/settings/slack/save" hx-target="#slack-result" hx-swap="innerHTML"
-        hx-confirm="Save Slack settings? The Robusta runner will restart (~30s).">
+        hx-confirm="Save Slack settings? The alert pipeline will restart (~30s).">
     <label class="field"><span class="s-label">Channel</span>
       <input type="text" name="slack_channel" value="{{ integrations.slack_channel }}"></label>
     <label class="field"><span class="s-label">Bot token</span>
@@ -47,10 +47,10 @@
 <div class="provider-card">
   <div class="provider-head"><span class="status-dot ok"></span>
     <span class="provider-name">🔗 Alert webhook → this console</span>
-    <span class="muted endpoint">Robusta webhook sink</span></div>
-  <p class="muted" style="margin:.2rem 0 .6rem">Where Robusta pushes enriched alerts. Running the console elsewhere? Point this at its <code>/api/ingest</code>.</p>
+    <span class="muted endpoint">alert pipeline</span></div>
+  <p class="muted" style="margin:.2rem 0 .6rem">Where the alert pipeline pushes enriched alerts. Running the console elsewhere? Point this at its <code>/api/ingest</code>.</p>
   <form class="provider-form" hx-post="/settings/webhook/save" hx-target="#webhook-result" hx-swap="innerHTML"
-        hx-confirm="Change the alert webhook URL? The Robusta runner will restart (~30s).">
+        hx-confirm="Change the alert webhook URL? The alert pipeline will restart (~30s).">
     <input type="text" name="webhook_url" value="{{ integrations.webhook_url }}">
     <button type="submit">Save</button>
   </form>

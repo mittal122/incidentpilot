@@ -1,71 +1,62 @@
-# IncidentPilot — Production Incident Agent
+# IncidentPilot
 
-Open-source incident-response agent for Kubernetes: alerts get enriched,
-AI-investigated, and acted on from one console.
+AI-powered incident response platform for Kubernetes: failures are
+detected in seconds, explained by an AI investigator with live cluster
+access, and fixed with one approved click — or automatically, where you
+allow it.
 
-Built by combining two upstream open-source projects with our own ops console:
+## Features
 
-| Piece | What it does | Source |
-|---|---|---|
-| [Robusta](https://github.com/robusta-dev/robusta) | Watches the cluster, enriches Prometheus alerts, runs playbooks, fans out to sinks (Slack + this console) | `vendor/robusta/` |
-| [HolmesGPT](https://github.com/robusta-dev/holmesgpt) | AI root-cause investigator with kubectl/Prometheus/Loki toolsets | `vendor/holmesgpt/` |
-| **Console** (ours) | Web UI: live incident feed, one-click Holmes investigations, chat, human-approved remediation | `console/` |
+- **Cluster overview** — a card per namespace: health status, restarts,
+  incidents, uptime; critical namespaces sort first, refreshed live
+- **Incident feed** — every failure auto-captured and enriched with
+  logs and events, pushed to Slack and the dashboard in seconds
+- **IncidentChat** — conversational AI with real tools (kubectl,
+  Prometheus, Loki): ask questions, investigate failures, run
+  operational commands with an approval gate; full conversation history
+- **AI root-cause analysis** — one click per incident; the AI reads the
+  actual logs and cites its evidence
+- **Log viewer** — terminal-style raw logs plus a plain-English AI
+  summary of what happened
+- **Auto-Heal** — opt-in per namespace: crash-looping pods restarted
+  automatically under a strict, audited policy (rate-limited,
+  databases excluded, escalates to humans when restarts don't help)
+- **Zero-code setup** — Slack, AI providers/keys/models, webhook and
+  cluster settings all configured from the Settings page
 
-## Architecture
-
-```
-Alertmanager ──► Robusta runner ──► Slack sink            (unchanged)
-                       │
-                       └──► webhook sink (json) ──► console /api/ingest ──► SQLite
-console UI:
-  /            incident list (htmx auto-refresh)
-  /incidents/x detail + "Investigate with Holmes" + approve-restart button
-  /chat        free-form questions to HolmesGPT (/api/chat proxy)
-```
-
-## Run the console locally
+## Quickstart
 
 ```bash
-./run.sh          # does everything: venv, deps, Holmes port-forward, server
+./run.sh          # venv, dependencies, AI engine port-forward, server
 # open http://localhost:8010
 ```
 
-Manual equivalent:
+Requires: a Kubernetes cluster with the IncidentPilot backend services
+installed (see `deploy/`), `kubectl`, Python 3.11+.
+
+## Repo layout
+
+```
+console/     the IncidentPilot application (FastAPI + htmx + SQLite)
+vendor/      third-party components (see CREDITS.md)
+deploy/      Helm values and deployment examples
+scripts/     demo lab — safe one-command failure simulations
+docs/        architecture overview, demo playbook, screenshots
+```
+
+## Demo lab
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r console/requirements.txt
-kubectl port-forward svc/robusta-holmes 10001:80 &   # Holmes API
-.venv/bin/uvicorn console.main:app --host 0.0.0.0 --port 8010
+./scripts/demo.sh up          # healthy sample app in a sandbox namespace
+./scripts/demo.sh crashloop   # watch detection → AI diagnosis → recovery
+./scripts/demo.sh recover     # everything back to green
 ```
 
-Env vars: `HOLMES_URL` (default `http://localhost:10001`), `HOLMES_MODEL`
-(default `nvidia-deepseek` — must name a model from Holmes' modelList,
-its built-in default may not be configured), `CLUSTER_NAME`, `DB_PATH`.
+All simulations are confined to throwaway namespaces — real workloads
+are never touched.
 
-## Wire Robusta to the console
+## Third-party components
 
-Add to your Robusta Helm values (keep your existing sinks!) and
-`helm upgrade`:
-
-```yaml
-sinksConfig:
-  - webhook_sink:
-      name: console_sink
-      url: http://<console-host>:8010/api/ingest   # kind: use docker network gateway, e.g. 172.19.0.1
-      format: json
-      size_limit: 65536
-```
-
-## Remediation model
-
-Nothing is auto-executed from the console. Each incident with an
-identified pod shows an **Approve: restart pod** button; a human click
-deletes the pod so its controller recreates it. Robusta playbooks
-(e.g. `on_pod_crash_loop` → `delete_pod`) can automate specific cases —
-configure those deliberately in Helm values.
-
-## Licenses
-
-`vendor/robusta` and `vendor/holmesgpt` are MIT-licensed by their
-authors; their LICENSE files are preserved in place. Console code is
-ours, same spirit.
+IncidentPilot builds on open-source components vendored under
+`vendor/`; their licenses are preserved there and summarized in
+[CREDITS.md](CREDITS.md).

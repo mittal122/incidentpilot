@@ -24,7 +24,7 @@ pkill -f "uvicorn console.main:app" 2>/dev/null || true
 pkill -f "port-forward.*robusta-holmes" 2>/dev/null || true
 sleep 1
 
-echo "==> Port-forwarding HolmesGPT on :$HOLMES_PORT"
+echo "==> Port-forwarding the AI engine on :$HOLMES_PORT"
 kubectl port-forward -n default svc/robusta-holmes "$HOLMES_PORT:80" >/dev/null 2>&1 &
 PF_PID=$!
 trap 'kill "$PF_PID" 2>/dev/null || true' EXIT

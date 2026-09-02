@@ -6,19 +6,19 @@
 <p class="muted">{% if i.namespace %}<a class="ns-link" href="/ns/{{ i.namespace }}">{{ i.namespace }}</a>{% else %}—{% endif %} / {{ i.resource or '—' }} · {{ i.created_at }} · status: {{ i.status }}</p>
 
 <section>
-  <h2>Enrichment (from Robusta)</h2>
+  <h2>Enrichment (auto-collected)</h2>
   <pre class="enrichment">{{ i.description or '(no description in alert payload)' }}</pre>
 </section>
 
 <section>
-  <h2>Root cause (HolmesGPT)</h2>
+  <h2>Root cause (AI analysis)</h2>
   <div id="investigation">
     {% if i.investigation %}
       {{ i.investigation_html|safe }}
     {% else %}
       <button hx-post="/incidents/{{ i.id }}/investigate" hx-target="#investigation"
-              hx-swap="innerHTML" hx-indicator="#inv-spinner">🔎 Investigate with Holmes</button>
-      <span id="inv-spinner" class="htmx-indicator">Holmes is investigating… (can take a minute)</span>
+              hx-swap="innerHTML" hx-indicator="#inv-spinner">🔎 Run AI investigation</button>
+      <span id="inv-spinner" class="htmx-indicator">AI engine investigating…</span>
     {% endif %}
   </div>
 </section>

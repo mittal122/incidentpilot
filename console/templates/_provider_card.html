@@ -59,7 +59,7 @@
   {% if p.configured and not p.active %}
   <button type="button" hx-post="/settings/{{ p.id }}/activate"
           hx-target="#activate-result-{{ p.id }}" hx-swap="innerHTML"
-          hx-confirm="Switch Holmes to {{ p.label }} ({{ p.model }})? Holmes will restart."
+          hx-confirm="Switch the AI engine to {{ p.label }} ({{ p.model }})? The AI engine will restart."
           hx-indicator="#spin-{{ p.id }}">Activate</button>
   {% endif %}
   {% if p.configured %}

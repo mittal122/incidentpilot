@@ -18,7 +18,7 @@ One-command failure simulation for live demos: `./scripts/demo.sh <scenario> [--
 
 ## Prerequisites
 
-1. Robusta + HolmesGPT installed (see README) with the webhook sink pointed
+1. IncidentPilot backend services installed (see README) with the webhook sink pointed
    at the console.
 2. Console running: `./run.sh` → http://localhost:8010.
 3. Slack sink configured (already: `#all-autosre`).
@@ -43,14 +43,14 @@ Overview page shows a new **demo-lab** card, green `Healthy`, `3/3 pods`.
   `[ERROR] redis connection refused`, `[FATAL] session store unavailable` —
   then exits 1. Kubernetes restarts it with exponential backoff.
 - **Resource:** `deploy/webshop` (image+command patched).
-- **App detects:** Robusta kubewatch fires "Crashing pod" within ~2 restarts;
+- **App detects:** the alert pipeline kubewatch fires "Crashing pod" within ~2 restarts;
   Prometheus `KubePodCrashLooping` follows.
 - **UI:** demo-lab card flips Healthy → **Critical** (red pulse, sorts first);
   incident row appears; namespace page shows the 💡 crash explanation; View
   Logs streams the red FATAL lines live (use "previous run" for the dead
   container).
 - **Slack:** "Crashing pod webshop-… in namespace demo-lab" with logs attached.
-- **AI:** Investigate → Holmes reads the logs and reports the redis dependency
+- **AI:** Investigate → the AI engine reads the logs and reports the redis dependency
   as root cause with suggested fixes; Logs → AI Summary produces the sectioned
   plain-English explanation.
 - **Recovery:** `recover` re-applies the original nginx spec → pods start
@@ -104,15 +104,15 @@ Overview page shows a new **demo-lab** card, green `Healthy`, `3/3 pods`.
 - **Simulates:** bad day: crashloop + imagepull + OOM at once.
 - **UI:** demo-lab card shows 3+ incidents in 24h, multiple error reasons;
   incident list interleaves three failure types; chat question "what is wrong
-  in demo-lab?" gives Holmes a genuinely multi-cause investigation.
+  in demo-lab?" gives the AI engine a genuinely multi-cause investigation.
 - **Recovery:** single `recover` fixes all three.
 
 ### 7. `autofix` — existing automated remediation, live
 
 - **Simulates:** crash-looping pod in `robusta-test-demo` — a namespace
-  matching the `robusta-test` prefix of the pre-existing Robusta playbook
+  matching the `robusta-test` prefix of the pre-existing pipeline playbook
   `on_pod_crash_loop → delete_pod`.
-- **What happens without any human:** pod crashes → Robusta detects → playbook
+- **What happens without any human:** pod crashes → the alert pipeline detects → playbook
   deletes the pod → Deployment recreates it → repeat. Slack shows both the
   crash finding and the playbook action.
 - **Talking point:** this is the "autopilot" primitive — same mechanism a
@@ -140,8 +140,8 @@ Overview page shows a new **demo-lab** card, green `Healthy`, `3/3 pods`.
 2. `./scripts/demo.sh crashloop --auto 300` → watch card turn red, open
    incident, show Slack ping. (2 min)
 3. View Logs → red FATAL lines → AI Summary tab. (2 min)
-4. Investigate with Holmes → walk through the root cause. (2 min)
-5. Ask Holmes chat: "what is broken in demo-lab and what should I do?" (1 min)
+4. Investigate with the AI engine → walk through the root cause. (2 min)
+5. Ask the AI engine chat: "what is broken in demo-lab and what should I do?" (1 min)
 6. Let `--auto` recover on stage → card returns green, Slack resolves. (1 min)
 7. `./scripts/demo.sh autofix` → automation fixing a pod with zero clicks. (1 min)
 8. `./scripts/demo.sh down` → cluster exactly as before.
