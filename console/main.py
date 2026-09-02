@@ -14,9 +14,12 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
+import base64
+
 import httpx
 import markdown as md_lib
 import nh3
+import yaml
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +52,12 @@ def db() -> sqlite3.Connection:
             investigation TEXT,
             raw TEXT,
             created_at TEXT
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )"""
     )
     conn.execute(
@@ -98,8 +107,18 @@ def db() -> sqlite3.Connection:
     return conn
 
 
+def setting(key: str, default: str = "") -> str:
+    """DB-backed setting with env-var fallback — editable from /settings."""
+    with db() as conn:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = ?", (key,)
+        ).fetchone()
+    return (row["value"] if row and row["value"] else
+            os.environ.get(key.upper(), default))
+
+
 def render(request: Request, name: str, **ctx) -> HTMLResponse:
-    ctx.update(cluster_name=CLUSTER_NAME)
+    ctx.update(cluster_name=setting("cluster_name", CLUSTER_NAME))
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -332,7 +351,8 @@ def active_model() -> str:
         row = conn.execute(
             "SELECT provider FROM providers WHERE active = 1"
         ).fetchone()
-    return f"console-{row['provider']}" if row else HOLMES_MODEL
+    return (f"console-{row['provider']}" if row
+            else setting("holmes_model", HOLMES_MODEL))
 
 
 # ── AI response rendering ────────────────────────────────────────────
@@ -379,7 +399,7 @@ def ask_holmes(question: str, history: list | None = None) -> tuple[str, list]:
     if history:
         payload["conversation_history"] = history
     resp = httpx.post(
-        f"{HOLMES_URL}/api/chat",
+        f"{setting('holmes_url', HOLMES_URL)}/api/chat",
         json=payload,
         timeout=httpx.Timeout(600, connect=10),
     )
@@ -868,6 +888,134 @@ def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
     return HTMLResponse(render_ai(analysis))
 
 
+# ── integrations (Slack / webhook / cluster) via runner config ───────
+# Robusta's runner reads sinks and global config from the secret
+# robusta-playbooks-config-secret (key active_playbooks.yaml). The
+# Settings page edits that config in place and restarts the runner —
+# the same mechanism `helm upgrade` uses, minus the helm round-trip.
+# NOTE: a later helm upgrade of the robusta release overwrites these
+# edits; mirror permanent changes into your Helm values.
+
+RUNNER_SECRET = "robusta-playbooks-config-secret"
+
+
+def load_runner_config() -> dict:
+    out = subprocess.run(
+        ["kubectl", "get", "secret", RUNNER_SECRET, "-n", "default",
+         "-o", "jsonpath={.data.active_playbooks\\.yaml}"],
+        capture_output=True, text=True, timeout=30)
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    return yaml.safe_load(base64.b64decode(out.stdout)) or {}
+
+
+def save_runner_config(cfg: dict):
+    b64 = base64.b64encode(yaml.safe_dump(cfg).encode()).decode()
+    patch = json.dumps({"data": {"active_playbooks.yaml": b64}})
+    out = subprocess.run(
+        ["kubectl", "patch", "secret", RUNNER_SECRET, "-n", "default",
+         "--type", "merge", "-p", patch],
+        capture_output=True, text=True, timeout=30)
+    if out.returncode != 0:
+        raise RuntimeError(out.stderr.strip())
+    subprocess.run(["kubectl", "rollout", "restart",
+                    "deployment/robusta-runner", "-n", "default"],
+                   capture_output=True, text=True, timeout=30)
+
+
+def find_sink(cfg: dict, sink_type: str) -> dict | None:
+    for s in cfg.get("sinks_config", []):
+        if sink_type in s:
+            return s[sink_type]
+    return None
+
+
+def integrations_info() -> dict:
+    """Current Slack/webhook/cluster config for the settings page."""
+    try:
+        cfg = load_runner_config()
+        slack = find_sink(cfg, "slack_sink") or {}
+        webhook = find_sink(cfg, "webhook_sink") or {}
+        return {
+            "available": True,
+            "slack_channel": slack.get("slack_channel", ""),
+            "slack_key_masked": mask_key(slack.get("api_key")),
+            "webhook_url": webhook.get("url", ""),
+            "robusta_cluster_name": cfg.get("global_config", {}).get("cluster_name", ""),
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e)[:200]}
+
+
+@app.post("/settings/app/save", response_class=HTMLResponse)
+def app_settings_save(cluster_name: str = Form(""), holmes_url: str = Form(""),
+                      holmes_model: str = Form("")):
+    with db() as conn:
+        for key, value in (("cluster_name", cluster_name),
+                           ("holmes_url", holmes_url),
+                           ("holmes_model", holmes_model)):
+            conn.execute(
+                "INSERT INTO app_settings (key, value) VALUES (?,?)"
+                " ON CONFLICT(key) DO UPDATE SET value = ?",
+                (key, value.strip(), value.strip()))
+    return HTMLResponse('<div class="action-ok">✓ saved — applies immediately</div>')
+
+
+@app.post("/settings/slack/save", response_class=HTMLResponse)
+def slack_save(slack_channel: str = Form(""), slack_token: str = Form("")):
+    try:
+        cfg = load_runner_config()
+        sink = find_sink(cfg, "slack_sink")
+        if sink is None:
+            sink = {"name": "main_slack_sink"}
+            cfg.setdefault("sinks_config", []).append({"slack_sink": sink})
+        if slack_channel.strip():
+            sink["slack_channel"] = slack_channel.strip()
+        if slack_token.strip():
+            sink["api_key"] = slack_token.strip()
+        save_runner_config(cfg)
+    except Exception as e:
+        return HTMLResponse(f'<div class="action-err">✗ {escape(str(e))}</div>')
+    return HTMLResponse('<div class="action-ok">✓ saved — Robusta runner restarting (~30s)</div>')
+
+
+@app.post("/settings/slack/test", response_class=HTMLResponse)
+def slack_test():
+    try:
+        sink = find_sink(load_runner_config(), "slack_sink") or {}
+        token = sink.get("api_key")
+        if not token:
+            return HTMLResponse('<div class="action-err">no Slack token configured</div>')
+        r = httpx.post("https://slack.com/api/auth.test",
+                       headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        body = r.json()
+        if body.get("ok"):
+            return HTMLResponse(
+                f'<div class="action-ok">✓ connected as <b>{escape(body.get("user", "?"))}</b>'
+                f' in workspace <b>{escape(body.get("team", "?"))}</b> — channel'
+                f' #{escape(sink.get("slack_channel", "?"))}</div>')
+        return HTMLResponse(f'<div class="action-err">✗ Slack: {escape(body.get("error", "unknown"))}</div>')
+    except Exception as e:
+        return HTMLResponse(f'<div class="action-err">✗ {escape(str(e))}</div>')
+
+
+@app.post("/settings/webhook/save", response_class=HTMLResponse)
+def webhook_save(webhook_url: str = Form(...)):
+    if not webhook_url.startswith("http"):
+        return HTMLResponse('<div class="action-err">URL must start with http(s)</div>')
+    try:
+        cfg = load_runner_config()
+        sink = find_sink(cfg, "webhook_sink")
+        if sink is None:
+            sink = {"name": "console_sink", "format": "json", "size_limit": 65536}
+            cfg.setdefault("sinks_config", []).append({"webhook_sink": sink})
+        sink["url"] = webhook_url.strip()
+        save_runner_config(cfg)
+    except Exception as e:
+        return HTMLResponse(f'<div class="action-err">✗ {escape(str(e))}</div>')
+    return HTMLResponse('<div class="action-ok">✓ saved — Robusta runner restarting (~30s)</div>')
+
+
 # ── settings page ────────────────────────────────────────────────────
 
 def mask_key(key: str | None) -> str:
@@ -901,7 +1049,13 @@ def settings_rows() -> list[dict]:
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     return render(request, "settings.html", page="settings",
-                  providers=settings_rows())
+                  providers=settings_rows(),
+                  app_cfg={
+                      "cluster_name": setting("cluster_name", CLUSTER_NAME),
+                      "holmes_url": setting("holmes_url", HOLMES_URL),
+                      "holmes_model": setting("holmes_model", HOLMES_MODEL),
+                  },
+                  integrations=integrations_info())
 
 
 def _provider_card(request: Request, pid: str) -> HTMLResponse:

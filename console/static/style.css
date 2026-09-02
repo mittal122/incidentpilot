@@ -197,6 +197,10 @@ pre.terminal { background: #090c10; border: 1px solid var(--border); border-radi
   flex: 1; min-width: 200px; background: #0d1420; border: 1px solid var(--border);
   border-radius: 6px; padding: .5rem .8rem; color: var(--fg); }
 .provider-form select { max-width: 320px; }
+.settings-h { margin-top: 2.2rem; }
+.field { display: flex; flex-direction: column; gap: .25rem; flex: 1;
+  min-width: 200px; }
+.field input { width: 100%; }
 
 /* ── chat with history sidebar ─────────────────────────────────── */
 .chat-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem;
