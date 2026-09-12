@@ -253,7 +253,11 @@ PROVIDERS = {
         "endpoint": "https://integrate.api.nvidia.com/v1",
         "models_url": "https://integrate.api.nvidia.com/v1/models",
         "litellm": lambda m: {"model": f"openai/{m}",
-                              "api_base": "https://integrate.api.nvidia.com/v1"},
+                              "api_base": "https://integrate.api.nvidia.com/v1",
+                              # NIM reasoning models leak thinking tokens into
+                              # content unless thinking is explicitly disabled
+                              "extra_body": {"chat_template_kwargs":
+                                             {"enable_thinking": False}}},
         "default_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
         "has_usage_api": False,
     },
