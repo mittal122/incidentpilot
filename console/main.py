@@ -392,6 +392,30 @@ def render_ai(text: str) -> str:
 
 # ── HolmesGPT ────────────────────────────────────────────────────────
 
+def ai_error_message(e: Exception) -> str:
+    """Turn AI-engine failures into actionable messages instead of raw 500s."""
+    detail = ""
+    if isinstance(e, httpx.HTTPStatusError):
+        try:
+            detail = e.response.json().get("detail", "")
+        except Exception:
+            detail = e.response.text[:200]
+    text = f"{e} {detail}"
+    if "403" in text or "Authorization failed" in text or "401" in text:
+        return ("The AI provider rejected the configured API key (authorization "
+                "failed). The key has likely expired or run out of credits. "
+                'Fix: open <a href="/settings">Settings</a>, paste a fresh key on a '
+                "provider card, click Test connection, then Activate.")
+    if "timed out" in text.lower() or "504" in text:
+        return ("The AI provider timed out — its servers are overloaded right now. "
+                "Try again in a minute, or activate a faster provider in "
+                '<a href="/settings">Settings</a>.')
+    if "Connect" in text or "connection" in text.lower():
+        return ("Cannot reach the AI engine. If running locally, restart ./run.sh "
+                "to refresh the port-forward.")
+    return f"AI engine error: {escape(str(e))} {escape(str(detail))[:200]}"
+
+
 def ask_holmes(question: str, history: list | None = None) -> tuple[str, list]:
     """Returns (analysis, new_history). Pass a conversation's stored history
     for follow-up context; the returned history includes this exchange."""
@@ -430,7 +454,7 @@ def investigate(incident_id: str):
     try:
         analysis, _ = ask_holmes(question)
     except Exception as e:
-        return HTMLResponse(f'<pre class="action-err">AI engine error: {e}</pre>')
+        return HTMLResponse(f'<div class="action-err">{ai_error_message(e)}</div>')
     with db() as conn:
         conn.execute(
             "UPDATE incidents SET investigation = ? WHERE id = ?",
@@ -486,7 +510,7 @@ def chat(ask: str = Form(...), conversation_id: int = Form(0)):
             analysis, history = ask_holmes(ask + MD_STYLE_HINT, history=history)
             body = render_ai(analysis)
         except Exception as e:
-            body = f'<div class="action-err">AI engine error: {escape(str(e))}</div>'
+            body = f'<div class="action-err">{ai_error_message(e)}</div>'
     entry = f'<div class="chat-entry"><div class="q">You: {escape(ask)}</div>{body}</div>'
     with db() as conn:
         conn.execute(
@@ -884,7 +908,7 @@ def summarize_logs(namespace: str = Form(...), pod: str = Form(...)):
     try:
         analysis, _ = ask_holmes(question)
     except Exception as e:
-        return HTMLResponse(f'<div class="action-err">AI engine error: {escape(str(e))}</div>')
+        return HTMLResponse(f'<div class="action-err">{ai_error_message(e)}</div>')
     return HTMLResponse(render_ai(analysis))
 
 
