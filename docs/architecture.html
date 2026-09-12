@@ -345,14 +345,14 @@ footer { text-align:center; color:var(--muted); font-size:.8rem; padding:2rem;
 <p>Applications run; Prometheus and kubewatch notice when they misbehave; the alert pipeline enriches each event into a finding and pushes it to Slack and the console; the console stores and displays it as a live, critical-first health dashboard; when a human wants to know <em>why</em>, one click sends the context to the IncidentChat AI engine, which investigates the actual cluster with real tools and returns an evidence-backed root cause rendered as rich UI; and when the fix is a restart, the human approves it and the console executes one validated kubectl command. The AI reasons, the rules react, the human decides.</p>
 
 <div class="callout">
-<strong>Repo layout:</strong> <code>vendor/</code> holds third-party component sources (see CREDITS.md); <code>console/</code> is our code (~700 lines Python, 8 templates, one stylesheet); <code>deploy/</code> holds Helm value examples; <code>./run.sh</code> boots everything locally. Secrets live only in cluster-side Helm values / ConfigMaps, never in the repo — which is what keeps the project safely open-sourceable.
+<strong>Repo layout:</strong> <code>vendor/</code> holds third-party component sources; <code>console/</code> is our code (~700 lines Python, 8 templates, one stylesheet); <code>deploy/</code> holds Helm value examples; <code>./run.sh</code> boots everything locally. Secrets live only in cluster-side Helm values / ConfigMaps, never in the repo — which is what keeps the project safely open-sourceable.
 </div>
 </section>
 
 </main>
 
 <footer>
-IncidentPilot · third-party components listed in CREDITS.md · 2026
+IncidentPilot · 2026
 </footer>
 
 </body>

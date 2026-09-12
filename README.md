@@ -121,7 +121,7 @@ Scenario-by-scenario playbook: [docs/demo-scenarios.md](docs/demo-scenarios.md).
 
 ```
 console/     the IncidentPilot application (FastAPI + htmx + SQLite, ~1k lines)
-vendor/      third-party components (see CREDITS.md)
+vendor/      third-party components
 deploy/      Helm values examples
 scripts/     demo lab
 docs/        architecture overview, demo playbook, screenshots
@@ -138,4 +138,4 @@ authenticating proxy and move keys to Kubernetes Secrets.
 ## License
 
 MIT — see [LICENSE](LICENSE). Third-party components under `vendor/`
-keep their own MIT licenses; see [CREDITS.md](CREDITS.md).
+keep their own MIT licenses.
